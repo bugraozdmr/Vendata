@@ -8,17 +8,21 @@ import '../../domain/models/visual_query.dart';
 class VisualQueryBuilder extends StatefulWidget {
   final List<TableSchema> tables;
   final String? initialTable;
+  final VisualQuery? initialQuery;
   final bool isExecuting;
   final void Function(String sql) onExecute;
   final ValueChanged<String>? onTableChanged;
+  final ValueChanged<VisualQuery>? onQueryChanged;
 
   const VisualQueryBuilder({
     super.key,
     required this.tables,
     this.initialTable,
+    this.initialQuery,
     this.isExecuting = false,
     required this.onExecute,
     this.onTableChanged,
+    this.onQueryChanged,
   });
 
   @override
@@ -32,16 +36,32 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
   @override
   void initState() {
     super.initState();
-    final defaultTable = widget.initialTable ?? '';
-    _query = VisualQuery(selectedTable: defaultTable);
+    if (widget.initialQuery != null) {
+      _query = widget.initialQuery!.copy();
+      if (widget.initialTable != null &&
+          widget.initialTable!.isNotEmpty &&
+          _query.selectedTable.isEmpty) {
+        _query.selectedTable = widget.initialTable!;
+      }
+    } else {
+      final defaultTable = widget.initialTable ?? '';
+      _query = VisualQuery(selectedTable: defaultTable);
+    }
+  }
+
+  void _notify() {
+    widget.onQueryChanged?.call(_query.copy());
   }
 
   @override
   void didUpdateWidget(covariant VisualQueryBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialTable != oldWidget.initialTable) {
+    if (widget.initialTable != oldWidget.initialTable &&
+        widget.initialTable != null &&
+        widget.initialTable!.isNotEmpty &&
+        widget.initialTable != _query.selectedTable) {
       setState(() {
-        _query.selectedTable = widget.initialTable ?? '';
+        _query.selectedTable = widget.initialTable!;
         _query.selectedColumns = [];
         _query.filters = [];
         _query.groupByColumns = [];
@@ -50,6 +70,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
         _query.calculatedFields = [];
         _query.joinConfig = null;
       });
+      _notify();
     }
   }
 
@@ -68,11 +89,13 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
 
   @override
   Widget build(BuildContext context) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     if (widget.tables.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -117,7 +140,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
         Expanded(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 90),
+            padding: EdgeInsets.only(bottom: isLandscape ? 24 : 90),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -132,7 +155,12 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                   height: 52,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: (currentSql.isEmpty || widget.isExecuting) ? null : () => widget.onExecute(currentSql),
+                    onTap: (currentSql.isEmpty || widget.isExecuting)
+                        ? null
+                        : () {
+                            _notify();
+                            widget.onExecute(currentSql);
+                          },
                     child: Container(
                       decoration: BoxDecoration(
                         color: (currentSql.isEmpty || widget.isExecuting) ? AppColors.textMuted : AppColors.accent,
@@ -179,7 +207,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: isSelected
               ? [BoxShadow(color: AppColors.primary.withAlpha(30), blurRadius: 8, offset: const Offset(0, 2))]
@@ -208,7 +236,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -225,7 +253,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                   color: AppColors.accentLight,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.table_chart_rounded, size: 22, color: AppColors.accent),
+                child: Icon(Icons.table_chart_rounded, size: 22, color: AppColors.accent),
               ),
               const SizedBox(width: 12),
               Column(
@@ -276,7 +304,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.table_rows_rounded, size: 16, color: AppColors.primary),
+                      Icon(Icons.table_rows_rounded, size: 16, color: AppColors.textPrimary),
                       const SizedBox(width: 8),
                       Text(
                         table.name,
@@ -329,6 +357,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                             _query.aggregates = [];
                             _query.orders = [];
                           });
+                          _notify();
                           widget.onTableChanged?.call(val);
                         }
                       },
@@ -341,7 +370,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                       Text('DISTINCT', style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
                       GestureDetector(
-                        onTap: () => setState(() => _query.isDistinct = !_query.isDistinct),
+                        onTap: () {
+                          setState(() => _query.isDistinct = !_query.isDistinct);
+                          _notify();
+                        },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -371,7 +403,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                 runSpacing: 8,
                 children: [
                   GestureDetector(
-                    onTap: () => setState(() => _query.selectedColumns = []),
+                    onTap: () {
+                      setState(() => _query.selectedColumns = []);
+                      _notify();
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
@@ -401,11 +436,12 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                           }
                           _query.selectedColumns = list;
                         });
+                        _notify();
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.accent : Colors.white,
+                          color: isSelected ? AppColors.accent : AppColors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
                         ),
@@ -443,6 +479,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                     ),
                   );
                 });
+                _notify();
               }
             },
             child: Container(
@@ -454,7 +491,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.add_rounded, size: 14, color: AppColors.accent),
+                  Icon(Icons.add_rounded, size: 14, color: AppColors.accent),
                   const SizedBox(width: 4),
                   Text('Filtre Ekle', style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
                 ],
@@ -485,7 +522,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                                   height: 34,
                                   padding: const EdgeInsets.symmetric(horizontal: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: AppColors.surface,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: DropdownButtonHideUnderline(
@@ -496,7 +533,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                                         DropdownMenuItem(value: 'AND', child: Text('VE')),
                                         DropdownMenuItem(value: 'OR', child: Text('VEYA')),
                                       ],
-                                      onChanged: (v) => setState(() => filter.combinator = v ?? 'AND'),
+                                      onChanged: (v) {
+                                        setState(() => filter.combinator = v ?? 'AND');
+                                        _notify();
+                                      },
                                     ),
                                   ),
                                 ),
@@ -507,7 +547,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                                 child: _buildMiniDropdown(
                                   value: filter.column,
                                   items: _availableColumns,
-                                  onChanged: (v) => setState(() => filter.column = v ?? filter.column),
+                                  onChanged: (v) {
+                                    setState(() => filter.column = v ?? filter.column);
+                                    _notify();
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -516,14 +559,20 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                                 child: _buildMiniDropdown(
                                   value: filter.operator,
                                   items: const ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'STARTS WITH', 'ENDS WITH', 'IS NULL', 'IS NOT NULL'],
-                                  onChanged: (v) => setState(() => filter.operator = v ?? filter.operator),
+                                  onChanged: (v) {
+                                    setState(() => filter.operator = v ?? filter.operator);
+                                    _notify();
+                                  },
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.error),
+                                icon: Icon(Icons.close_rounded, size: 18, color: AppColors.error),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                onPressed: () => setState(() => _query.filters.removeAt(idx)),
+                                onPressed: () {
+                                  setState(() => _query.filters.removeAt(idx));
+                                  _notify();
+                                },
                               ),
                             ],
                           ),
@@ -533,13 +582,16 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                               height: 36,
                               child: TextFormField(
                                 initialValue: filter.value,
-                                onChanged: (v) => filter.value = v,
+                                onChanged: (v) {
+                                  filter.value = v;
+                                  _notify();
+                                },
                                 style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textPrimary),
                                 decoration: InputDecoration(
                                   hintText: filter.operator.contains('LIKE') ? 'Arama metni...' : 'Değer...',
                                   hintStyle: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
                                   filled: true,
-                                  fillColor: Colors.white,
+                                  fillColor: AppColors.surface,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                                 ),
@@ -563,6 +615,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                 setState(() {
                   _query.orders.add(QueryOrder(column: _availableColumns.first, ascending: true));
                 });
+                _notify();
               }
             },
             child: Container(
@@ -574,9 +627,9 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.add_rounded, size: 14, color: AppColors.primary),
+                  Icon(Icons.add_rounded, size: 14, color: AppColors.textPrimary),
                   const SizedBox(width: 4),
-                  Text('Sırala', style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  Text('Sırala', style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                 ],
               ),
             ),
@@ -595,12 +648,18 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                           child: _buildMiniDropdown(
                             value: order.column,
                             items: _availableColumns,
-                            onChanged: (v) => setState(() => order.column = v ?? order.column),
+                            onChanged: (v) {
+                              setState(() => order.column = v ?? order.column);
+                              _notify();
+                            },
                           ),
                         ),
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: () => setState(() => order.ascending = !order.ascending),
+                          onTap: () {
+                            setState(() => order.ascending = !order.ascending);
+                            _notify();
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
@@ -618,10 +677,13 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                          icon: Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                          onPressed: () => setState(() => _query.orders.removeAt(idx)),
+                          onPressed: () {
+                            setState(() => _query.orders.removeAt(idx));
+                            _notify();
+                          },
                         ),
                       ],
                     ),
@@ -640,7 +702,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                         _buildMiniDropdown(
                           value: _query.limit.toString(),
                           items: const ['10', '25', '50', '100', '500', '1000'],
-                          onChanged: (v) => setState(() => _query.limit = int.tryParse(v ?? '50') ?? 50),
+                          onChanged: (v) {
+                            setState(() => _query.limit = int.tryParse(v ?? '50') ?? 50);
+                            _notify();
+                          },
                         ),
                       ],
                     ),
@@ -659,7 +724,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                               onPressed: _query.offset >= _query.limit
-                                  ? () => setState(() => _query.offset -= _query.limit)
+                                  ? () {
+                                      setState(() => _query.offset -= _query.limit);
+                                      _notify();
+                                    }
                                   : null,
                             ),
                             Expanded(
@@ -673,7 +741,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                               icon: const Icon(Icons.chevron_right_rounded, size: 20),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              onPressed: () => setState(() => _query.offset += _query.limit),
+                              onPressed: () {
+                                setState(() => _query.offset += _query.limit);
+                                _notify();
+                              },
                             ),
                           ],
                         ),
@@ -766,7 +837,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.add_rounded, size: 14, color: AppColors.accent),
+                  Icon(Icons.add_rounded, size: 14, color: AppColors.accent),
                   const SizedBox(width: 4),
                   Text('Metrik Ekle', style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
                 ],
@@ -814,7 +885,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.error),
+                            icon: Icon(Icons.close_rounded, size: 16, color: AppColors.error),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                             onPressed: () => setState(() => _query.aggregates.removeAt(idx)),
@@ -918,7 +989,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.add_rounded, size: 14, color: AppColors.accent),
+                  Icon(Icons.add_rounded, size: 14, color: AppColors.accent),
                   const SizedBox(width: 4),
                   Text('Formül Ekle', style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
                 ],
@@ -952,7 +1023,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                                 style: GoogleFonts.firaCode(fontSize: 12, color: AppColors.textPrimary),
                                 decoration: InputDecoration(
                                   filled: true,
-                                  fillColor: Colors.white,
+                                  fillColor: AppColors.surface,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                                 ),
@@ -970,7 +1041,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                                 style: GoogleFonts.spaceGrotesk(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent),
                                 decoration: InputDecoration(
                                   filled: true,
-                                  fillColor: Colors.white,
+                                  fillColor: AppColors.surface,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                                 ),
@@ -978,7 +1049,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.error),
+                            icon: Icon(Icons.close_rounded, size: 16, color: AppColors.error),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                             onPressed: () => setState(() => _query.calculatedFields.removeAt(idx)),
@@ -1116,7 +1187,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -1149,7 +1220,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                     color: AppColors.cardMuted,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.copy_rounded, size: 14, color: AppColors.textSecondary),
+                  child: Icon(Icons.copy_rounded, size: 14, color: AppColors.textSecondary),
                 ),
               ),
             ],
@@ -1172,7 +1243,7 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -1223,9 +1294,9 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
               value: items.contains(value) ? value : null,
               hint: hint != null ? Text(hint, style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted)) : null,
               isExpanded: true,
-              dropdownColor: Colors.white,
+              dropdownColor: AppColors.surface,
               style: GoogleFonts.spaceGrotesk(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textSecondary),
+              icon: Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textSecondary),
               items: items.map((item) {
                 return DropdownMenuItem<T>(value: item, child: Text(item.toString(), overflow: TextOverflow.ellipsis));
               }).toList(),
@@ -1254,16 +1325,16 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
           height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: items.contains(value) ? value : (items.isNotEmpty ? items.first : null),
               isExpanded: true,
-              dropdownColor: Colors.white,
+              dropdownColor: AppColors.surface,
               style: GoogleFonts.spaceGrotesk(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.textSecondary),
+              icon: Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.textSecondary),
               items: items.map((col) {
                 return DropdownMenuItem(value: col, child: Text(col, overflow: TextOverflow.ellipsis));
               }).toList(),

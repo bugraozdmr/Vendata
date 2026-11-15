@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/file_helper.dart';
 import '../../domain/models/saved_query.dart';
 import '../providers/database_provider.dart';
+import '../providers/theme_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   final void Function(String sql) onOpenQuery;
@@ -26,6 +27,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final engine = ref.watch(databaseEngineProvider);
     final tablesState = ref.watch(tablesProvider);
     final queryState = ref.watch(queryProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final dbSizeBytes = engine.getDatabaseSizeBytes();
     final totalTables = tablesState.tables.length;
@@ -34,7 +37,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, isLandscape ? 24 : 100),
           physics: const BouncingScrollPhysics(),
           children: [
             Text(
@@ -48,6 +51,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 20),
             _buildStorageSection(dbSizeBytes, totalTables, totalRows),
+            const SizedBox(height: 28),
+            _buildThemeSection(themeMode),
             const SizedBox(height: 28),
             _buildQueryHistory(queryState),
             const SizedBox(height: 28),
@@ -78,7 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -95,7 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   color: AppColors.accentLight,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.storage_rounded, color: AppColors.accent, size: 22),
+                child: Icon(Icons.storage_rounded, color: AppColors.accent, size: 22),
               ),
               const SizedBox(width: 12),
               Text(
@@ -115,6 +120,90 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildThemeSection(ThemeMode mode) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentLight,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.palette_rounded, color: AppColors.accent, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Görünüm',
+                style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildThemePill(mode, false, 'Açık', Icons.light_mode_rounded),
+              const SizedBox(width: 10),
+              _buildThemePill(mode, true, 'Koyu', Icons.dark_mode_rounded),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemePill(ThemeMode mode, bool dark, String label, IconData icon) {
+    final isSelected = (mode == ThemeMode.dark) == dark;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => ref.read(themeModeProvider.notifier).setDark(dark),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : AppColors.cardMuted,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.dmSans(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -199,7 +288,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -222,7 +311,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.border, width: 1),
                 ),
@@ -260,7 +349,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
           boxShadow: isSelected
@@ -297,7 +386,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 8, offset: const Offset(0, 2)),
@@ -365,7 +454,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 color: AppColors.cardMuted,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.copy_rounded, size: 14, color: AppColors.textMuted),
+              child: Icon(Icons.copy_rounded, size: 14, color: AppColors.textMuted),
             ),
           ),
           const SizedBox(width: 6),
@@ -435,7 +524,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text('Sıfırla', style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700)),
         content: Text(

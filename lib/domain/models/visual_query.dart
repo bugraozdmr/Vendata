@@ -239,4 +239,216 @@ class VisualQuery {
 
     return sql;
   }
+
+  VisualQuery copy() {
+    return VisualQuery(
+      selectedTable: selectedTable,
+      isDistinct: isDistinct,
+      selectedColumns: List<String>.from(selectedColumns),
+      calculatedFields: calculatedFields
+          .map((c) => CalculatedField(expression: c.expression, alias: c.alias))
+          .toList(),
+      filters: filters
+          .map((f) => QueryFilter(
+                column: f.column,
+                operator: f.operator,
+                value: f.value,
+                combinator: f.combinator,
+              ))
+          .toList(),
+      groupByColumns: List<String>.from(groupByColumns),
+      aggregates: aggregates
+          .map((a) => AggregateMetric(
+                func: a.func,
+                column: a.column,
+                customAlias: a.customAlias,
+              ))
+          .toList(),
+      havingClause: havingClause,
+      orders: orders
+          .map((o) => QueryOrder(column: o.column, ascending: o.ascending))
+          .toList(),
+      joinConfig: joinConfig != null
+          ? JoinConfig(
+              type: joinConfig!.type,
+              table: joinConfig!.table,
+              leftCol: joinConfig!.leftCol,
+              rightCol: joinConfig!.rightCol,
+            )
+          : null,
+      limit: limit,
+      offset: offset,
+    );
+  }
+
+  static VisualQuery? tryParseSql(String rawSql) {
+    final sql = rawSql.trim();
+    if (sql.isEmpty) return null;
+
+    if (!RegExp(r'^\s*SELECT\b', caseSensitive: false).hasMatch(sql)) {
+      return null;
+    }
+
+    try {
+      // 1. Table name after FROM
+      final fromMatch = RegExp(
+        r'\bFROM\s+["`]?([a-zA-Z0-9_]+)["`]?(\.[a-zA-Z0-9_]+)?',
+        caseSensitive: false,
+      ).firstMatch(sql);
+
+      if (fromMatch == null) return null;
+      final table = fromMatch.group(1) ?? '';
+      if (table.isEmpty) return null;
+
+      final vq = VisualQuery(selectedTable: table);
+
+      // 2. DISTINCT
+      if (RegExp(r'\bSELECT\s+DISTINCT\b', caseSensitive: false).hasMatch(sql)) {
+        vq.isDistinct = true;
+      }
+
+      // 3. Columns between SELECT and FROM
+      final selectPartMatch = RegExp(
+        r'^\s*SELECT\s+(?:DISTINCT\s+)?(.*?)\s+\bFROM\b',
+        caseSensitive: false,
+        dotAll: true,
+      ).firstMatch(sql);
+
+      if (selectPartMatch != null) {
+        final colStr = selectPartMatch.group(1)?.trim() ?? '*';
+        if (colStr != '*') {
+          final cols = colStr.split(',').map((c) {
+            var trimmed = c.trim();
+            if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+                (trimmed.startsWith('`') && trimmed.endsWith('`'))) {
+              trimmed = trimmed.substring(1, trimmed.length - 1);
+            }
+            return trimmed;
+          }).where((c) => c.isNotEmpty && !c.contains('(')).toList();
+          vq.selectedColumns = cols;
+        }
+      }
+
+      // 4. WHERE clause
+      final whereMatch = RegExp(
+        r'\bWHERE\s+(.*?)(?:\s+\b(?:GROUP\s+BY|ORDER\s+BY|LIMIT)\b|\s*;|\s*$)',
+        caseSensitive: false,
+        dotAll: true,
+      ).firstMatch(sql);
+
+      if (whereMatch != null) {
+        final whereClause = whereMatch.group(1)?.trim() ?? '';
+        if (whereClause.isNotEmpty) {
+          final conditions = _splitWhereConditions(whereClause);
+          for (final cond in conditions) {
+            final filter = _parseCondition(cond.condition, cond.combinator);
+            if (filter != null) {
+              vq.filters.add(filter);
+            }
+          }
+        }
+      }
+
+      // 5. ORDER BY
+      final orderMatch = RegExp(
+        r'\bORDER\s+BY\s+(.*?)(?:\s+\bLIMIT\b|\s*;|\s*$)',
+        caseSensitive: false,
+        dotAll: true,
+      ).firstMatch(sql);
+
+      if (orderMatch != null) {
+        final orderStr = orderMatch.group(1)?.trim() ?? '';
+        final parts = orderStr.split(',');
+        for (final p in parts) {
+          final trimmed = p.trim();
+          final isDesc = RegExp(r'\bDESC\b', caseSensitive: false).hasMatch(trimmed);
+          var colName = trimmed.replaceAll(RegExp(r'\s+(ASC|DESC)\b', caseSensitive: false), '').trim();
+          if ((colName.startsWith('"') && colName.endsWith('"')) ||
+              (colName.startsWith('`') && colName.endsWith('`'))) {
+            colName = colName.substring(1, colName.length - 1);
+          }
+          if (colName.isNotEmpty) {
+            vq.orders.add(QueryOrder(column: colName, ascending: !isDesc));
+          }
+        }
+      }
+
+      // 6. LIMIT
+      final limitMatch = RegExp(r'\bLIMIT\s+(\d+)', caseSensitive: false).firstMatch(sql);
+      if (limitMatch != null) {
+        vq.limit = int.tryParse(limitMatch.group(1)!) ?? 50;
+      }
+
+      // 7. OFFSET
+      final offsetMatch = RegExp(r'\bOFFSET\s+(\d+)', caseSensitive: false).firstMatch(sql);
+      if (offsetMatch != null) {
+        vq.offset = int.tryParse(offsetMatch.group(1)!) ?? 0;
+      }
+
+      return vq;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static QueryFilter? _parseCondition(String rawCond, String combinator) {
+    final cond = rawCond.trim();
+    if (cond.isEmpty) return null;
+
+    final isNotNullMatch = RegExp(r'["`]?([a-zA-Z0-9_]+)["`]?\s+IS\s+NOT\s+NULL', caseSensitive: false).firstMatch(cond);
+    if (isNotNullMatch != null) {
+      return QueryFilter(column: isNotNullMatch.group(1)!, operator: 'IS NOT NULL', value: '', combinator: combinator);
+    }
+
+    final isNullMatch = RegExp(r'["`]?([a-zA-Z0-9_]+)["`]?\s+IS\s+NULL', caseSensitive: false).firstMatch(cond);
+    if (isNullMatch != null) {
+      return QueryFilter(column: isNullMatch.group(1)!, operator: 'IS NULL', value: '', combinator: combinator);
+    }
+
+    final likeMatch = RegExp(r'["`]?([a-zA-Z0-9_]+)["`]?\s+(NOT\s+LIKE|LIKE)\s+(.*)', caseSensitive: false).firstMatch(cond);
+    if (likeMatch != null) {
+      final col = likeMatch.group(1)!;
+      final op = likeMatch.group(2)!.toUpperCase();
+      var val = likeMatch.group(3)!.trim();
+      if (val.startsWith("'") && val.endsWith("'")) val = val.substring(1, val.length - 1);
+      if (val.startsWith('%') && val.endsWith('%')) {
+        return QueryFilter(column: col, operator: 'LIKE', value: val.substring(1, val.length - 1), combinator: combinator);
+      } else if (val.endsWith('%')) {
+        return QueryFilter(column: col, operator: 'STARTS WITH', value: val.substring(0, val.length - 1), combinator: combinator);
+      } else if (val.startsWith('%')) {
+        return QueryFilter(column: col, operator: 'ENDS WITH', value: val.substring(1), combinator: combinator);
+      }
+      return QueryFilter(column: col, operator: op, value: val, combinator: combinator);
+    }
+
+    final compMatch = RegExp(r'["`]?([a-zA-Z0-9_]+)["`]?\s*(=|!=|<>|>=|<=|>|<)\s*(.*)', caseSensitive: false).firstMatch(cond);
+    if (compMatch != null) {
+      final col = compMatch.group(1)!;
+      var op = compMatch.group(2)!;
+      if (op == '<>') op = '!=';
+      var val = compMatch.group(3)!.trim();
+      if (val.startsWith("'") && val.endsWith("'")) val = val.substring(1, val.length - 1);
+      return QueryFilter(column: col, operator: op, value: val, combinator: combinator);
+    }
+
+    return null;
+  }
+
+  static List<({String condition, String combinator})> _splitWhereConditions(String whereStr) {
+    final result = <({String condition, String combinator})>[];
+    final tokens = whereStr.split(RegExp(r'\s+\b(AND|OR)\b\s+', caseSensitive: false));
+    final combinators = RegExp(r'\s+\b(AND|OR)\b\s+', caseSensitive: false)
+        .allMatches(whereStr)
+        .map((m) => m.group(1)!.toUpperCase())
+        .toList();
+
+    for (var i = 0; i < tokens.length; i++) {
+      final t = tokens[i].trim();
+      if (t.isNotEmpty) {
+        final comb = i == 0 ? 'AND' : (i - 1 < combinators.length ? combinators[i - 1] : 'AND');
+        result.add((condition: t, combinator: comb));
+      }
+    }
+    return result;
+  }
 }

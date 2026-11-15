@@ -71,11 +71,12 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(connectionsProvider);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, isLandscape ? 24 : 100),
           physics: const BouncingScrollPhysics(),
           children: [
             Row(
@@ -140,13 +141,13 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: AppColors.accent.withAlpha(60), width: 1.5),
                 ),
                 child: Row(
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.accent),
@@ -167,8 +168,6 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            _buildRemoteInfoCard(),
-            const SizedBox(height: 18),
             if (state.activeConnection != null) ...[
               _buildActiveCard(state.activeConnection!),
               const SizedBox(height: 18),
@@ -215,53 +214,6 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
     );
   }
 
-  Widget _buildRemoteInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.accentBlueWash,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.dns_rounded, size: 22, color: AppColors.accentBlue),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Uzak Veritabanları',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'PostgreSQL ve MySQL/MariaDB sunucularına bağlanıp tablolarınızı sorgulayın. '
-                  'Bağlantı bilgileri bu cihazda saklanır.',
-                  style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted, height: 1.4),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActiveCard(DbConnection connection) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -275,7 +227,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(_iconFor(connection.type), size: 20, color: AppColors.success),
@@ -291,7 +243,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                     Container(
                       width: 7,
                       height: 7,
-                      decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -333,14 +285,14 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.link_off_rounded, size: 14, color: AppColors.error),
+                  Icon(Icons.link_off_rounded, size: 14, color: AppColors.error),
                   const SizedBox(width: 4),
                   Text(
                     'Kes',
@@ -363,7 +315,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -397,7 +349,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: isActive ? Border.all(color: AppColors.success.withAlpha(70), width: 1.4) : null,
         boxShadow: [
@@ -412,7 +364,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
               color: AppColors.cardMuted,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(_iconFor(connection.type), size: 20, color: AppColors.primary),
+            child: Icon(_iconFor(connection.type), size: 20, color: AppColors.textPrimary),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -443,7 +395,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
           PopupMenuButton<String>(
             tooltip: 'Seçenekler',
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            color: Colors.white,
+            color: AppColors.surface,
             onSelected: (value) {
               switch (value) {
                 case 'edit':
@@ -473,7 +425,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                 color: AppColors.cardMuted,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textSecondary),
+              child: Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textSecondary),
             ),
           ),
           const SizedBox(width: 6),
@@ -505,7 +457,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(
           'Bağlantıyı Sil',
@@ -675,7 +627,7 @@ class _ConnectionFormSheetState extends ConsumerState<_ConnectionFormSheet> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -711,7 +663,7 @@ class _ConnectionFormSheetState extends ConsumerState<_ConnectionFormSheet> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.textMuted),
+                  Icon(Icons.info_outline_rounded, size: 13, color: AppColors.textMuted),
                   const SizedBox(width: 5),
                   Expanded(
                     child: Text(
@@ -818,11 +770,11 @@ class _ConnectionFormSheetState extends ConsumerState<_ConnectionFormSheet> {
                       child: OutlinedButton(
                         onPressed: _testing ? null : _test,
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.border),
+                          side: BorderSide(color: AppColors.border),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         child: _testing
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
@@ -901,7 +853,7 @@ class _ConnectionFormSheetState extends ConsumerState<_ConnectionFormSheet> {
         const SizedBox(height: 4),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.border),
           ),
@@ -969,7 +921,7 @@ class _ConnectionFormSheetState extends ConsumerState<_ConnectionFormSheet> {
               margin: EdgeInsets.only(right: type == DbType.values.last ? 0 : 8),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
               decoration: BoxDecoration(
-                color: selected ? AppColors.primary : Colors.white,
+                color: selected ? AppColors.primary : AppColors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: selected ? AppColors.primary : AppColors.border),
               ),
@@ -1032,20 +984,20 @@ class _ConnectionFormSheetState extends ConsumerState<_ConnectionFormSheet> {
             hintText: hint,
             hintStyle: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.surface,
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+              borderSide: BorderSide(color: AppColors.accent, width: 1.5),
             ),
           ),
         ),

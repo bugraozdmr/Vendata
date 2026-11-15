@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../providers/database_provider.dart';
+import '../providers/theme_provider.dart';
 import 'connections_screen.dart';
 import 'settings_screen.dart';
 import 'sql_screen.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeModeProvider);
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final pages = [
@@ -98,29 +100,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(11),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.analytics_rounded, size: 20, color: Colors.white),
+                      ),
+                    ),
+                    const Spacer(),
+                    _buildRailItem(index: 0, icon: Icons.grid_view_rounded, tooltip: 'Tablolar'),
+                    const SizedBox(height: 14),
+                    _buildRailItem(index: 1, icon: Icons.terminal_rounded, tooltip: 'SQL'),
+                    const SizedBox(height: 14),
+                    _buildRailItem(index: 2, icon: Icons.dns_rounded, tooltip: 'Bağlantılar'),
+                    const SizedBox(height: 14),
+                    _buildRailItem(index: 3, icon: Icons.tune_rounded, tooltip: 'Ayarlar'),
+                    const Spacer(),
+                  ],
+                ),
+              ),
             ),
-            child: const Center(
-              child: Icon(Icons.analytics_rounded, size: 20, color: Colors.white),
-            ),
-          ),
-          const Spacer(),
-          _buildRailItem(index: 0, icon: Icons.grid_view_rounded, tooltip: 'Tablolar'),
-          const SizedBox(height: 14),
-          _buildRailItem(index: 1, icon: Icons.terminal_rounded, tooltip: 'SQL'),
-          const SizedBox(height: 14),
-          _buildRailItem(index: 2, icon: Icons.dns_rounded, tooltip: 'Bağlantılar'),
-          const SizedBox(height: 14),
-          _buildRailItem(index: 3, icon: Icons.tune_rounded, tooltip: 'Ayarlar'),
-          const Spacer(),
-        ],
+          );
+        },
       ),
     );
   }

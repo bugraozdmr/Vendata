@@ -90,11 +90,13 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     if (widget.tables.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -116,7 +118,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 36,
                 height: 36,
                 child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accent),
@@ -143,7 +145,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
       return Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -160,7 +162,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
                     color: AppColors.accentLight,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.analytics_rounded, size: 22, color: AppColors.accent),
+                  child: Icon(Icons.analytics_rounded, size: 22, color: AppColors.accent),
                 ),
                 const SizedBox(width: 12),
                 Column(
@@ -200,7 +202,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.table_rows_rounded, size: 16, color: AppColors.primary),
+                        Icon(Icons.table_rows_rounded, size: 16, color: AppColors.textPrimary),
                         const SizedBox(width: 8),
                         Text(
                           table.name,
@@ -224,7 +226,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 90),
+      padding: EdgeInsets.only(bottom: isLandscape ? 24 : 90),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -232,7 +234,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -258,9 +260,9 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
                         value: widget.tables.any((t) => t.name == _selectedTable) ? _selectedTable : null,
                         hint: Text('Tablo Seçiniz...', style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted)),
                         isExpanded: true,
-                        dropdownColor: Colors.white,
+                        dropdownColor: AppColors.surface,
                         style: GoogleFonts.spaceGrotesk(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textSecondary),
+                        icon: Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textSecondary),
                         items: widget.tables.map((t) {
                           return DropdownMenuItem(value: t.name, child: Text(t.name));
                         }).toList(),
@@ -284,7 +286,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
           if (_profile != null) ...[
             Row(
               children: [
-                _buildStatPill('KAYIT', '${_profile!.totalRows}', AppColors.primary),
+                _buildStatPill('KAYIT', '${_profile!.totalRows}', AppColors.textPrimary),
                 const SizedBox(width: 10),
                 _buildStatPill('SÜTUN', '${_profile!.columnCount}', AppColors.accent),
                 const SizedBox(width: 10),
@@ -302,7 +304,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -358,7 +360,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -428,7 +430,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -549,7 +551,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -620,9 +622,9 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
             child: DropdownButton<String>(
               value: items.contains(value) ? value : (items.isNotEmpty ? items.first : null),
               isExpanded: true,
-              dropdownColor: Colors.white,
+              dropdownColor: AppColors.surface,
               style: GoogleFonts.spaceGrotesk(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textSecondary),
+              icon: Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textSecondary),
               items: items.map((col) {
                 return DropdownMenuItem(value: col, child: Text(col, overflow: TextOverflow.ellipsis));
               }).toList(),

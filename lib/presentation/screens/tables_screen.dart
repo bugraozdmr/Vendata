@@ -41,11 +41,12 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
   @override
   Widget build(BuildContext context) {
     final tablesState = ref.watch(tablesProvider);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, isLandscape ? 24 : 100),
           physics: const BouncingScrollPhysics(),
           children: [
             Row(
@@ -148,7 +149,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: AppColors.accent.withAlpha(60), width: 1.5),
                   boxShadow: [
@@ -161,7 +162,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                 ),
                 child: Row(
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
@@ -252,7 +253,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
+          Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(error, style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.error)),
@@ -275,10 +276,10 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.dns_rounded, size: 18, color: AppColors.success),
+            child: Icon(Icons.dns_rounded, size: 18, color: AppColors.success),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -311,14 +312,14 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.link_off_rounded, size: 14, color: AppColors.error),
+                  Icon(Icons.link_off_rounded, size: 14, color: AppColors.error),
                   const SizedBox(width: 4),
                   Text(
                     'Kes',
@@ -341,7 +342,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -421,7 +422,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
         width: 170,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -483,7 +484,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
@@ -503,7 +504,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                       color: AppColors.cardMuted,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.table_chart_rounded, color: AppColors.primary, size: 20),
+                    child: Icon(Icons.table_chart_rounded, color: AppColors.textPrimary, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -527,7 +528,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                             ),
                             if (hasStarredQueries) ...[
                               const SizedBox(width: 4),
-                              const Icon(Icons.star_rounded, size: 14, color: AppColors.warning),
+                              Icon(Icons.star_rounded, size: 14, color: AppColors.warning),
                             ],
                           ],
                         ),
@@ -592,7 +593,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
 
           return Container(
             height: MediaQuery.of(context).size.height * 0.78,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
@@ -621,7 +622,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                               color: AppColors.accentLight,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Icon(Icons.table_chart_rounded, color: AppColors.accent, size: 22),
+                            child: Icon(Icons.table_chart_rounded, color: AppColors.accent, size: 22),
                           ),
                           const SizedBox(width: 12),
                           Column(
@@ -652,7 +653,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                             color: AppColors.cardMuted,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.close_rounded, size: 20, color: AppColors.textSecondary),
+                          child: Icon(Icons.close_rounded, size: 20, color: AppColors.textSecondary),
                         ),
                       ),
                     ],
@@ -677,7 +678,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.surface,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: AppColors.border),
                             ),
@@ -723,7 +724,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppColors.surface,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: AppColors.border),
                           ),
@@ -742,7 +743,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     border: Border(top: BorderSide(color: AppColors.border)),
                   ),
                   child: SizedBox(
@@ -780,7 +781,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 6, offset: const Offset(0, 2)),
@@ -852,7 +853,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(color: AppColors.cardMuted, borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.copy_rounded, size: 13, color: AppColors.textSecondary),
+                  child: Icon(Icons.copy_rounded, size: 13, color: AppColors.textSecondary),
                 ),
               ),
               const SizedBox(width: 6),

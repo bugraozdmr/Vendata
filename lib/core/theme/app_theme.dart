@@ -5,18 +5,30 @@ import 'app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get lightTheme {
+  static ThemeData build(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    AppColors.setDark(isDark);
+
+    final colorScheme = isDark
+        ? ColorScheme.dark(
+            primary: AppColors.primary,
+            secondary: AppColors.accent,
+            surface: AppColors.surface,
+            error: AppColors.error,
+          )
+        : ColorScheme.light(
+            primary: AppColors.primary,
+            secondary: AppColors.accent,
+            surface: AppColors.surface,
+            error: AppColors.error,
+          );
+
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.light,
+      brightness: brightness,
       scaffoldBackgroundColor: AppColors.background,
       primaryColor: AppColors.primary,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.primary,
-        secondary: AppColors.accent,
-        surface: AppColors.surface,
-        error: AppColors.error,
-      ),
+      colorScheme: colorScheme,
       cardTheme: CardThemeData(
         color: AppColors.card,
         elevation: 0,
@@ -36,7 +48,7 @@ class AppTheme {
           letterSpacing: -1.0,
         ),
       ),
-      dividerTheme: const DividerThemeData(
+      dividerTheme: DividerThemeData(
         color: AppColors.border,
         thickness: 1,
       ),
@@ -103,4 +115,8 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get lightTheme => build(Brightness.light);
+
+  static ThemeData get darkTheme => build(Brightness.dark);
 }

@@ -70,7 +70,7 @@ class _SavedQueriesSheetState extends ConsumerState<SavedQueriesSheet> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.78,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -120,7 +120,7 @@ class _SavedQueriesSheetState extends ConsumerState<SavedQueriesSheet> {
                       color: AppColors.cardMuted,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.close_rounded, size: 20, color: AppColors.textSecondary),
+                    child: Icon(Icons.close_rounded, size: 20, color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -154,7 +154,7 @@ class _SavedQueriesSheetState extends ConsumerState<SavedQueriesSheet> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
-                        color: _filterByCurrentTable ? AppColors.accentLight : Colors.white,
+                        color: _filterByCurrentTable ? AppColors.accentLight : AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _filterByCurrentTable ? AppColors.accent : AppColors.border,
@@ -229,7 +229,7 @@ class _SavedQueriesSheetState extends ConsumerState<SavedQueriesSheet> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
           boxShadow: isSelected
@@ -268,7 +268,7 @@ class _SavedQueriesSheetState extends ConsumerState<SavedQueriesSheet> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 8, offset: const Offset(0, 2)),
@@ -330,7 +330,7 @@ class _SavedQueriesSheetState extends ConsumerState<SavedQueriesSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.table_chart_rounded, size: 11, color: AppColors.accent),
+                      Icon(Icons.table_chart_rounded, size: 11, color: AppColors.accent),
                       const SizedBox(width: 4),
                       Text(
                         query.tableName!,
@@ -381,7 +381,7 @@ class _SavedQueriesSheetState extends ConsumerState<SavedQueriesSheet> {
                     color: AppColors.cardMuted,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.copy_rounded, size: 14, color: AppColors.textSecondary),
+                  child: Icon(Icons.copy_rounded, size: 14, color: AppColors.textSecondary),
                 ),
               ),
               if (widget.onLoadIntoEditor != null) ...[

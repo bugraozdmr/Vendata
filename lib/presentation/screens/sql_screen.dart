@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/export_helper.dart';
 import '../../domain/models/chart_config.dart';
 import '../../domain/models/query_result.dart';
+import '../../domain/models/visual_query.dart';
 import '../providers/connection_provider.dart';
 import '../providers/database_provider.dart';
 import '../widgets/data_grid_table.dart';
@@ -26,6 +27,7 @@ class QueryTabModel {
   QueryResult? result;
   ChartConfig? chartConfig;
   bool isExecuting;
+  VisualQuery? visualQuery;
 
   QueryTabModel({
     required this.id,
@@ -38,6 +40,7 @@ class QueryTabModel {
     this.result,
     this.chartConfig,
     this.isExecuting = false,
+    this.visualQuery,
   });
 
   void dispose() {
@@ -255,13 +258,17 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final tablesState = ref.watch(tablesProvider);
     final currentTab = _currentTab;
     final hasResults = currentTab.result != null && !currentTab.result!.hasError && currentTab.result!.rows.isNotEmpty;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final mediaQuery = MediaQuery.of(context);
+    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+    final isCompact = isLandscape &&
+        (mediaQuery.viewInsets.bottom > 0 || mediaQuery.size.height < 360);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!isCompact) ...[
             // Top Header: Clean typography without logo
             Padding(
               padding: EdgeInsets.fromLTRB(20, isLandscape ? 8 : 16, 20, 0),
@@ -291,7 +298,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.dns_rounded, size: 12, color: AppColors.success),
+                              Icon(Icons.dns_rounded, size: 12, color: AppColors.success),
                               const SizedBox(width: 4),
                               ConstrainedBox(
                                 constraints: const BoxConstraints(maxWidth: 120),
@@ -345,7 +352,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.border),
                         boxShadow: [
@@ -354,7 +361,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.star_rounded, size: 18, color: AppColors.warning),
+                          Icon(Icons.star_rounded, size: 18, color: AppColors.warning),
                           const SizedBox(width: 4),
                           Text(
                             'Sorgularım',
@@ -372,17 +379,20 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               ),
             ),
             const SizedBox(height: 10),
+            ],
 
             // Multi-Tab Bar: Tactile Blockit style tabs
             _buildTabBar(),
             const SizedBox(height: 8),
 
-            // Active Table Selector Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _buildTableSelectorBar(tablesState),
-            ),
-            const SizedBox(height: 8),
+            if (!isCompact) ...[
+              // Active Table Selector Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildTableSelectorBar(tablesState),
+              ),
+              const SizedBox(height: 8),
+            ],
 
             // Sub-Tabs: Sorgu vs Sonuç
             Padding(
@@ -462,7 +472,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.border,
@@ -484,7 +494,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 width: 7,
                 height: 7,
                 margin: const EdgeInsets.only(right: 6),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.error,
                   shape: BoxShape.circle,
                 ),
@@ -494,7 +504,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 width: 7,
                 height: 7,
                 margin: const EdgeInsets.only(right: 6),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.accent,
                   shape: BoxShape.circle,
                 ),
@@ -546,7 +556,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
         width: 38,
         height: 38,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(color: AppColors.border),
           boxShadow: [
@@ -557,7 +567,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
             ),
           ],
         ),
-        child: const Center(
+        child: Center(
           child: Icon(Icons.add_rounded, size: 20, color: AppColors.textPrimary),
         ),
       ),
@@ -575,7 +585,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
           boxShadow: [
@@ -590,7 +600,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 color: AppColors.accentLight,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.table_chart_rounded, size: 16, color: AppColors.accent),
+              child: Icon(Icons.table_chart_rounded, size: 16, color: AppColors.accent),
             ),
             const SizedBox(width: 10),
             Text(
@@ -645,7 +655,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
         boxShadow: [
@@ -660,7 +670,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               color: AppColors.accentLight,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.table_chart_rounded, size: 16, color: AppColors.accent),
+            child: Icon(Icons.table_chart_rounded, size: 16, color: AppColors.accent),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -686,7 +696,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           PopupMenuButton<String>(
             tooltip: 'Tabloyu Değiştir',
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            color: Colors.white,
+            color: AppColors.surface,
             onSelected: (val) {
               if (val == '__clear__') {
                 setState(() {
@@ -730,7 +740,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                     style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
                   ),
                   const SizedBox(width: 2),
-                  const Icon(Icons.arrow_drop_down_rounded, size: 16, color: AppColors.textSecondary),
+                  Icon(Icons.arrow_drop_down_rounded, size: 16, color: AppColors.textSecondary),
                 ],
               ),
             ),
@@ -750,7 +760,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
+            color: isSelected ? AppColors.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             boxShadow: isSelected
                 ? [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))]
@@ -759,14 +769,14 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: isSelected ? AppColors.primary : AppColors.textMuted),
+              Icon(icon, size: 16, color: isSelected ? AppColors.textPrimary : AppColors.textMuted),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: GoogleFonts.dmSans(
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : AppColors.textMuted,
+                  color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
                 ),
               ),
             ],
@@ -808,10 +818,22 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                     key: ValueKey('vqb_${currentTab.id}'),
                     tables: tablesState.tables,
                     initialTable: currentTab.activeTable,
+                    initialQuery: currentTab.visualQuery ??
+                        VisualQuery.tryParseSql(currentTab.sqlController.text),
                     isExecuting: currentTab.isExecuting,
-                    onExecute: (sql) => _runCurrentTabQuery(sql, true, currentTab.activeTable),
+                    onQueryChanged: (vq) {
+                      currentTab.visualQuery = vq;
+                      currentTab.sqlController.text = vq.toSql();
+                    },
+                    onExecute: (sql) {
+                      currentTab.visualQuery ??= VisualQuery.tryParseSql(sql);
+                      _runCurrentTabQuery(sql, true, currentTab.activeTable);
+                    },
                     onTableChanged: (tableName) => setState(() {
                       currentTab.activeTable = tableName;
+                      if (currentTab.visualQuery != null) {
+                        currentTab.visualQuery!.selectedTable = tableName;
+                      }
                       if (currentTab.title.startsWith('Sorgu ')) {
                         currentTab.title = tableName;
                       }
@@ -845,12 +867,29 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final isSelected = _currentTab.queryMode == mode;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _currentTab.queryMode = mode),
+      onTap: () {
+        if (_currentTab.queryMode != mode) {
+          setState(() {
+            if (mode == 0 && _currentTab.sqlController.text.isNotEmpty) {
+              final parsed = VisualQuery.tryParseSql(_currentTab.sqlController.text);
+              if (parsed != null) {
+                _currentTab.visualQuery = parsed;
+                if (parsed.selectedTable.isNotEmpty) {
+                  _currentTab.activeTable = parsed.selectedTable;
+                }
+              }
+            } else if (mode == 2 && _currentTab.visualQuery != null) {
+              _currentTab.sqlController.text = _currentTab.visualQuery!.toSql();
+            }
+            _currentTab.queryMode = mode;
+          });
+        }
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: isSelected
               ? [BoxShadow(color: AppColors.primary.withAlpha(30), blurRadius: 8, offset: const Offset(0, 2))]
@@ -880,7 +919,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, isLandscape ? 56 : 100),
+      padding: EdgeInsets.fromLTRB(20, 4, 20, isLandscape ? 16 : 100),
       child: Column(
         children: [
           QueryShortcuts(
@@ -891,7 +930,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -951,7 +990,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                       width: 52,
                       margin: const EdgeInsets.only(right: 10),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.surface,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: isFavorite ? AppColors.warning : AppColors.border),
                         boxShadow: [
@@ -1017,7 +1056,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 44,
               height: 44,
               child: CircularProgressIndicator(
@@ -1090,7 +1129,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
@@ -1105,7 +1144,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                     color: AppColors.errorWash,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(Icons.error_outline_rounded, size: 32, color: AppColors.error),
+                  child: Icon(Icons.error_outline_rounded, size: 32, color: AppColors.error),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -1234,7 +1273,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                       borderRadius: BorderRadius.circular(9),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: const Icon(Icons.open_in_full_rounded, size: 15, color: AppColors.textPrimary),
+                    child: Icon(Icons.open_in_full_rounded, size: 15, color: AppColors.textPrimary),
                   ),
                 ),
               ),
@@ -1260,7 +1299,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: _isExporting
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 15,
                             height: 15,
                             child: CircularProgressIndicator(
@@ -1268,14 +1307,14 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                               color: AppColors.success,
                             ),
                           )
-                        : const Icon(Icons.download_rounded, size: 15, color: AppColors.success),
+                        : Icon(Icons.download_rounded, size: 15, color: AppColors.success),
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const Divider(height: 1, color: AppColors.border),
+        Divider(height: 1, color: AppColors.border),
         Expanded(
           child: currentTab.resultType == 0
               ? DataGridTable(result: result)
@@ -1341,7 +1380,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
+          Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

@@ -120,7 +120,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
           boxShadow: [
@@ -192,7 +192,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
         boxShadow: [
@@ -328,9 +328,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
             child: DropdownButton<String>(
               value: items.contains(value) ? value : (items.isNotEmpty ? items.first : null),
               isExpanded: true,
-              dropdownColor: Colors.white,
+              dropdownColor: AppColors.surface,
               style: GoogleFonts.spaceGrotesk(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textSecondary),
+              icon: Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textSecondary),
               items: items.map((col) {
                 return DropdownMenuItem(
                   value: col,
@@ -363,7 +363,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       height: isLandscape ? 220 : 300,
       padding: const EdgeInsets.fromLTRB(10, 16, 16, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
       ),
@@ -427,7 +427,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            getDrawingHorizontalLine: (val) => const FlLine(
+            getDrawingHorizontalLine: (val) => FlLine(
               color: AppColors.border,
               strokeWidth: 0.8,
               dashArray: [4, 4],
@@ -460,7 +460,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       height: isLandscape ? 220 : 300,
       padding: const EdgeInsets.fromLTRB(10, 16, 16, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
       ),
@@ -485,7 +485,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            getDrawingHorizontalLine: (val) => const FlLine(
+            getDrawingHorizontalLine: (val) => FlLine(
               color: AppColors.border,
               strokeWidth: 0.8,
               dashArray: [4, 4],
@@ -704,7 +704,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.border),
         ),
@@ -726,7 +726,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
       ),

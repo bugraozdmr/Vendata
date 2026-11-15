@@ -13,7 +13,7 @@ class MetricCard extends StatelessWidget {
     required this.label,
     required this.value,
     this.icon,
-    this.accentColor = AppColors.accent,
+    this.accentColor = const Color(0xFFEE5D36),
   });
 
   @override
@@ -21,7 +21,7 @@ class MetricCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [

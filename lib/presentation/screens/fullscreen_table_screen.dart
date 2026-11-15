@@ -37,8 +37,8 @@ class _FullscreenTableScreenState extends State<FullscreenTableScreen> {
                 horizontal: 16,
                 vertical: isLandscape ? 8 : 12,
               ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
                 border: Border(bottom: BorderSide(color: AppColors.border, width: 1)),
               ),
               child: Row(
@@ -52,7 +52,7 @@ class _FullscreenTableScreenState extends State<FullscreenTableScreen> {
                         color: AppColors.cardMuted,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.fullscreen_exit_rounded,
                         size: 20,
                         color: AppColors.textPrimary,
@@ -104,7 +104,7 @@ class _FullscreenTableScreenState extends State<FullscreenTableScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: _isExporting
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
@@ -115,7 +115,7 @@ class _FullscreenTableScreenState extends State<FullscreenTableScreen> {
                           : Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.download_rounded, size: 16, color: AppColors.success),
+                                Icon(Icons.download_rounded, size: 16, color: AppColors.success),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Excel İndir',

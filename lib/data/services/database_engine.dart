@@ -74,7 +74,76 @@ class DatabaseEngine {
       );
     ''');
 
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS _vendata_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    ''');
+
     _migrateSavedQueriesTable();
+    _seedInitialConnections();
+  }
+
+  void _seedInitialConnections() {
+    try {
+      final existing = _db.select('SELECT id FROM _vendata_connections WHERE id IN (?, ?);', [
+        'conn_infinityfree_health2care',
+        'conn_neon_neondb',
+      ]);
+      final existingIds = existing.map((r) => r['id'] as String).toSet();
+
+      if (!existingIds.contains('conn_infinityfree_health2care')) {
+        saveConnection(DbConnection(
+          id: 'conn_infinityfree_health2care',
+          name: 'InfinityFree (health2care)',
+          type: DbType.mysql,
+          host: 'sql113.infinityfree.com',
+          port: 3306,
+          database: 'if0_42943365_health2care',
+          username: 'if0_42943365',
+          password: '781cjMuTGbtTZm',
+          useSsl: false,
+          createdAt: DateTime(2026, 1, 1),
+        ));
+      }
+
+      if (!existingIds.contains('conn_neon_neondb')) {
+        saveConnection(DbConnection(
+          id: 'conn_neon_neondb',
+          name: 'Neon DB (neondb)',
+          type: DbType.postgresql,
+          host: 'ep-mute-field-aezobwer-pooler.c-2.us-east-2.aws.neon.tech',
+          port: 5432,
+          database: 'neondb',
+          username: 'neondb_owner',
+          password: 'npg_8YoOEpPFd0DS',
+          useSsl: true,
+          createdAt: DateTime(2026, 1, 2),
+        ));
+      }
+    } catch (_) {}
+  }
+
+  String? getSetting(String key) {
+    try {
+      final res = _db.select('SELECT value FROM _vendata_settings WHERE key = ? LIMIT 1;', [key]);
+      if (res.isEmpty) return null;
+      return res.first['value'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void setSetting(String key, String value) {
+    _db.execute(
+      '''
+      INSERT INTO _vendata_settings (key, value)
+      VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+      ''',
+      [key, value],
+    );
   }
 
   void _migrateSavedQueriesTable() {

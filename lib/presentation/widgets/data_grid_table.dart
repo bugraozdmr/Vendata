@@ -20,10 +20,14 @@ class _DataGridTableState extends State<DataGridTable> {
   bool _sortAscending = true;
   String _filterText = '';
   final TextEditingController _filterController = TextEditingController();
+  final ScrollController _verticalController = ScrollController();
+  final ScrollController _horizontalController = ScrollController();
 
   @override
   void dispose() {
     _filterController.dispose();
+    _verticalController.dispose();
+    _horizontalController.dispose();
     super.dispose();
   }
 
@@ -51,7 +55,7 @@ class _DataGridTableState extends State<DataGridTable> {
                 child: Container(
                   height: 42,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.border, width: 1),
                     boxShadow: [
@@ -69,10 +73,10 @@ class _DataGridTableState extends State<DataGridTable> {
                     decoration: InputDecoration(
                       hintText: 'Tabloda ara...',
                       hintStyle: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
+                      prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
                       suffixIcon: _filterText.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                              icon: Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
                               onPressed: () {
                                 _filterController.clear();
                                 setState(() => _filterText = '');
@@ -104,17 +108,22 @@ class _DataGridTableState extends State<DataGridTable> {
             ],
           ),
         ),
-        const Divider(height: 1, color: AppColors.border),
+        Divider(height: 1, color: AppColors.border),
         Expanded(
           child: Scrollbar(
+            controller: _verticalController,
             thumbVisibility: true,
             child: SingleChildScrollView(
+              controller: _verticalController,
               scrollDirection: Axis.vertical,
               physics: const BouncingScrollPhysics(),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: DataTable(
+              child: Scrollbar(
+                controller: _horizontalController,
+                child: SingleChildScrollView(
+                  controller: _horizontalController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: DataTable(
                   columnSpacing: 24,
                   horizontalMargin: 16,
                   headingRowHeight: 44,
@@ -147,7 +156,7 @@ class _DataGridTableState extends State<DataGridTable> {
                     final isEven = rowIndex % 2 == 0;
                     return DataRow(
                       color: WidgetStateProperty.all(
-                        isEven ? Colors.white : AppColors.background.withAlpha(120),
+                        isEven ? AppColors.surface : AppColors.background.withAlpha(120),
                       ),
                       cells: List.generate(widget.result.columns.length, (colIndex) {
                         final val = colIndex < row.length ? row[colIndex] : null;
@@ -187,6 +196,7 @@ class _DataGridTableState extends State<DataGridTable> {
                     );
                   }),
                 ),
+                ),
               ),
             ),
           ),
@@ -199,7 +209,7 @@ class _DataGridTableState extends State<DataGridTable> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(colName, style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w700)),
         content: SelectableText(
@@ -209,7 +219,7 @@ class _DataGridTableState extends State<DataGridTable> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Kapat', style: GoogleFonts.dmSans(fontWeight: FontWeight.w600, color: AppColors.primary)),
+            child: Text('Kapat', style: GoogleFonts.dmSans(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           ),
         ],
       ),

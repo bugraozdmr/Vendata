@@ -204,7 +204,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     opacity: _bottomOpacity.value,
                     child: Column(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
