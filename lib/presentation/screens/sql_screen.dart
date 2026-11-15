@@ -260,162 +260,107 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final hasResults = currentTab.result != null && !currentTab.result!.hasError && currentTab.result!.rows.isNotEmpty;
     final mediaQuery = MediaQuery.of(context);
     final isLandscape = mediaQuery.orientation == Orientation.landscape;
-    final isCompact = isLandscape &&
-        (mediaQuery.viewInsets.bottom > 0 || mediaQuery.size.height < 360);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!isCompact) ...[
-            // Top Header: Clean typography without logo
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, isLandscape ? 8 : 16, 20, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'SQL',
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: isLandscape ? 24 : 32,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -1.0,
-                        ),
-                      ),
-                      if (tablesState.isRemote) ...[
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: AppColors.successWash,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.success.withAlpha(60)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.dns_rounded, size: 12, color: AppColors.success),
-                              const SizedBox(width: 4),
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 120),
-                                child: Text(
-                                  tablesState.connectionLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.success,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      SavedQueriesSheet.show(
-                        context: context,
-                        activeTable: currentTab.activeTable,
-                        onSelectQuery: (sql, tableName) {
-                          Navigator.pop(context);
-                          if (tableName != null && tableName.isNotEmpty) {
-                            setState(() {
-                              currentTab.activeTable = tableName;
-                              currentTab.title = tableName;
-                            });
-                          }
-                          _runCurrentTabQuery(sql, true, tableName);
-                        },
-                        onLoadIntoEditor: (sql, tableName) {
-                          Navigator.pop(context);
-                          setState(() {
-                            if (tableName != null && tableName.isNotEmpty) {
-                              currentTab.activeTable = tableName;
-                              currentTab.title = tableName;
-                            }
-                            currentTab.sqlController.text = sql;
-                            currentTab.activeTab = 0;
-                            currentTab.queryMode = 2; // SQL Konsolu
-                          });
-                        },
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            if (isLandscape) ...[
+              // Landscape Compact Single Bar: Tab Bar + Sub Tabs + Actions
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                child: Row(
+                  children: [
+                    Expanded(child: _buildTabBar(margin: EdgeInsets.zero)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: AppColors.cardMuted,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 6, offset: const Offset(0, 2)),
-                        ],
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.star_rounded, size: 18, color: AppColors.warning),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Sorgularım',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
+                          _buildTabButton('Sorgu', 0, Icons.edit_note_rounded, expand: false),
+                          _buildTabButton(
+                            hasResults ? 'Sonuç (${currentTab.result!.rowCount})' : 'Sonuç',
+                            1,
+                            Icons.table_rows_rounded,
+                            expand: false,
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    _buildSavedQueriesButton(currentTab),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            ],
-
-            // Multi-Tab Bar: Tactile Blockit style tabs
-            _buildTabBar(),
-            const SizedBox(height: 8),
-
-            if (!isCompact) ...[
-              // Active Table Selector Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildTableSelectorBar(tablesState),
+              ),
+              const SizedBox(height: 4),
+            ] else ...[
+              // Portrait Spacious Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'SQL',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -1.0,
+                          ),
+                        ),
+                        if (tablesState.isRemote) ...[
+                          const SizedBox(width: 10),
+                          _buildRemoteIndicator(tablesState),
+                        ],
+                      ],
+                    ),
+                    _buildSavedQueriesButton(currentTab),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildTabBar(),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: _buildTableSelectorBar(tablesState),
               ),
               const SizedBox(height: 8),
-            ],
-
-            // Sub-Tabs: Sorgu vs Sonuç
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppColors.cardMuted,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    _buildTabButton('Sorgu', 0, Icons.edit_note_rounded),
-                    _buildTabButton(
-                      hasResults ? 'Sonuç (${currentTab.result!.rowCount})' : 'Sonuç',
-                      1,
-                      Icons.table_rows_rounded,
-                    ),
-                  ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardMuted,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildTabButton('Sorgu', 0, Icons.edit_note_rounded),
+                      _buildTabButton(
+                        hasResults ? 'Sonuç (${currentTab.result!.rowCount})' : 'Sonuç',
+                        1,
+                        Icons.table_rows_rounded,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
+            ],
 
             // Content Area: Either Query Input or Results
             Expanded(
@@ -429,10 +374,101 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildRemoteIndicator(TablesState tablesState) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.successWash,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.success.withAlpha(60)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.dns_rounded, size: 12, color: AppColors.success),
+          const SizedBox(width: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 120),
+            child: Text(
+              tablesState.connectionLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.dmSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.success,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSavedQueriesButton(QueryTabModel currentTab) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        SavedQueriesSheet.show(
+          context: context,
+          activeTable: currentTab.activeTable,
+          onSelectQuery: (sql, tableName) {
+            Navigator.pop(context);
+            if (tableName != null && tableName.isNotEmpty) {
+              setState(() {
+                currentTab.activeTable = tableName;
+                currentTab.title = tableName;
+              });
+            }
+            _runCurrentTabQuery(sql, true, tableName);
+          },
+          onLoadIntoEditor: (sql, tableName) {
+            Navigator.pop(context);
+            setState(() {
+              if (tableName != null && tableName.isNotEmpty) {
+                currentTab.activeTable = tableName;
+                currentTab.title = tableName;
+              }
+              currentTab.sqlController.text = sql;
+              currentTab.activeTab = 0;
+              currentTab.queryMode = 2; // SQL Konsolu
+            });
+          },
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 6, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.star_rounded, size: 18, color: AppColors.warning),
+            const SizedBox(width: 4),
+            Text(
+              'Sorgularım',
+              style: GoogleFonts.dmSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar({EdgeInsets margin = const EdgeInsets.symmetric(horizontal: 20)}) {
     return Container(
       height: 38,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: margin,
       child: Row(
         children: [
           Expanded(
@@ -750,40 +786,41 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     );
   }
 
-  Widget _buildTabButton(String label, int index, IconData icon) {
+  Widget _buildTabButton(String label, int index, IconData icon, {bool expand = true}) {
     final isSelected = _currentTab.activeTab == index;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _currentTab.activeTab = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected
-                ? [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: isSelected ? AppColors.textPrimary : AppColors.textMuted),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.dmSans(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
-                ),
+    final btn = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _currentTab.activeTab = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isSelected ? AppColors.textPrimary : AppColors.textMuted),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+
+    return expand ? Expanded(child: btn) : btn;
   }
 
   Widget _buildQueryInputSection(TablesState tablesState) {
@@ -918,42 +955,43 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final availableTableNames = tablesState.tables.map((t) => t.name).toList();
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-    return Padding(
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.fromLTRB(20, 4, 20, isLandscape ? 16 : 100),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           QueryShortcuts(
             availableTables: availableTableNames,
             onInsert: _handleShortcutInsert,
           ),
           const SizedBox(height: 10),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: TextField(
-                  controller: tab.sqlController,
-                  maxLines: null,
-                  expands: true,
-                  keyboardType: TextInputType.multiline,
-                  style: GoogleFonts.firaCode(
-                    fontSize: 13,
-                    color: AppColors.codeText,
-                    height: 1.5,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'SQL sorgunuzu yazın...',
-                    hintStyle: GoogleFonts.firaCode(fontSize: 13, color: AppColors.textMuted),
-                    contentPadding: const EdgeInsets.all(16),
-                    border: InputBorder.none,
-                  ),
+          Container(
+            height: isLandscape ? 150 : 250,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: TextField(
+                controller: tab.sqlController,
+                maxLines: null,
+                expands: true,
+                keyboardType: TextInputType.multiline,
+                style: GoogleFonts.firaCode(
+                  fontSize: 13,
+                  color: AppColors.codeText,
+                  height: 1.5,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'SQL sorgunuzu yazın...',
+                  hintStyle: GoogleFonts.firaCode(fontSize: 13, color: AppColors.textMuted),
+                  contentPadding: const EdgeInsets.all(16),
+                  border: InputBorder.none,
                 ),
               ),
             ),
