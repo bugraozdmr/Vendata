@@ -214,12 +214,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'v${AppConfig.appVersion} • %100 Çevrimdışı & Yerel',
+                          'v${AppConfig.appVersion}',
                           style: GoogleFonts.dmSans(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.textMuted,
-                            letterSpacing: 0.2,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],

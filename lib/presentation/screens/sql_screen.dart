@@ -1055,6 +1055,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               const SizedBox(height: 16),
               Text(
                 'Henüz Sorgu Çalıştırılmadı',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 8),
@@ -1148,6 +1149,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               const SizedBox(height: 16),
               Text(
                 'Sonuç Yok',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 8),
@@ -1275,27 +1277,24 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
         ),
         const Divider(height: 1, color: AppColors.border),
         Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: isLandscape ? 56 : 80),
-            child: currentTab.resultType == 0
-                ? DataGridTable(result: result)
-                : (currentTab.chartConfig == null
-                    ? Center(
-                        child: Text(
-                          'Grafik için sayısal sütun gerekli.',
-                          style: GoogleFonts.dmSans(color: AppColors.textMuted, fontSize: 14),
-                        ),
-                      )
-                    : InteractiveChart(
-                        result: result,
-                        config: currentTab.chartConfig!,
-                        onConfigChanged: (newConfig) {
-                          setState(() {
-                            currentTab.chartConfig = newConfig;
-                          });
-                        },
-                      )),
-          ),
+          child: currentTab.resultType == 0
+              ? DataGridTable(result: result)
+              : (currentTab.chartConfig == null
+                  ? Center(
+                      child: Text(
+                        'Grafik için sayısal sütun gerekli.',
+                        style: GoogleFonts.dmSans(color: AppColors.textMuted, fontSize: 14),
+                      ),
+                    )
+                  : InteractiveChart(
+                      result: result,
+                      config: currentTab.chartConfig!,
+                      onConfigChanged: (newConfig) {
+                        setState(() {
+                          currentTab.chartConfig = newConfig;
+                        });
+                      },
+                    )),
         ),
       ],
     );

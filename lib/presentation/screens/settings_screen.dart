@@ -57,13 +57,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Column(
                 children: [
                   Text(
-                    '${AppConfig.appName} Local Studio',
+                    AppConfig.appName,
                     style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'v${AppConfig.appVersion} • SQLite 3.5.2 • %100 Çevrimdışı',
-                    style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                    'v${AppConfig.appVersion}',
+                    style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted),
                   ),
                 ],
               ),

@@ -62,12 +62,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     return Scaffold(
-      extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: pages,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildFloatingBottomNav(context),
+          ),
+        ],
       ),
-      bottomNavigationBar: _buildFloatingBottomNav(context),
     );
   }
 
@@ -155,39 +166,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildFloatingBottomNav(BuildContext context) {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
     return SafeArea(
+      top: false,
+      left: false,
+      right: false,
+      bottom: true,
+      minimum: const EdgeInsets.only(bottom: 6),
       child: Container(
-        margin: EdgeInsets.fromLTRB(
-          isLandscape ? 160 : 54,
-          0,
-          isLandscape ? 160 : 54,
-          isLandscape ? 8 : 20,
-        ),
-        height: isLandscape ? 48 : 64,
-        padding: EdgeInsets.symmetric(
-          horizontal: isLandscape ? 8 : 10,
-          vertical: isLandscape ? 4 : 8,
-        ),
+        margin: const EdgeInsets.symmetric(horizontal: 48),
+        height: 58,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
           color: AppColors.primary,
-          borderRadius: BorderRadius.circular(isLandscape ? 24 : 32),
+          borderRadius: BorderRadius.circular(29),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(45),
-              blurRadius: isLandscape ? 16 : 24,
-              offset: Offset(0, isLandscape ? 4 : 10),
+              blurRadius: 18,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildNavItem(index: 0, icon: Icons.grid_view_rounded, isLandscape: isLandscape),
-            _buildNavItem(index: 1, icon: Icons.terminal_rounded, isLandscape: isLandscape),
-            _buildNavItem(index: 2, icon: Icons.dns_rounded, isLandscape: isLandscape),
-            _buildNavItem(index: 3, icon: Icons.tune_rounded, isLandscape: isLandscape),
+            _buildNavItem(index: 0, icon: Icons.grid_view_rounded),
+            _buildNavItem(index: 1, icon: Icons.terminal_rounded),
+            _buildNavItem(index: 2, icon: Icons.dns_rounded),
+            _buildNavItem(index: 3, icon: Icons.tune_rounded),
           ],
         ),
       ),
@@ -197,7 +203,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildNavItem({
     required int index,
     required IconData icon,
-    required bool isLandscape,
   }) {
     final isSelected = _currentIndex == index;
 
@@ -217,17 +222,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
-        width: isSelected ? (isLandscape ? 56 : 68) : (isLandscape ? 42 : 50),
-        height: isLandscape ? 38 : 48,
+        width: isSelected ? 62 : 46,
+        height: 44,
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(isLandscape ? 19 : 24),
+          borderRadius: BorderRadius.circular(22),
         ),
         child: Center(
           child: Icon(
             icon,
-            size: isLandscape ? 20 : 24,
-            color: isSelected ? Colors.white : Colors.white.withAlpha(130),
+            size: 22,
+            color: isSelected ? Colors.white : Colors.white.withAlpha(140),
           ),
         ),
       ),

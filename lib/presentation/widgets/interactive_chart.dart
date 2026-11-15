@@ -101,12 +101,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
       builder: (context, constraints) {
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(16, 4, 16, isLandscape ? 12 : 24),
+          padding: EdgeInsets.fromLTRB(16, 4, 16, isLandscape ? 16 : 90),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildControls(context, isLandscape),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _renderChart(limitedPoints, isLandscape, constraints.maxWidth),
             ],
           ),
@@ -116,17 +116,90 @@ class _InteractiveChartState extends State<InteractiveChart> {
   }
 
   Widget _buildControls(BuildContext context, bool isLandscape) {
+    if (isLandscape) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(5),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: _buildDropdown(
+                label: 'Kategori (X)',
+                value: widget.config.labelColumn,
+                items: widget.result.columns,
+                onChanged: (val) {
+                  if (val != null) {
+                    widget.onConfigChanged(widget.config.copyWith(labelColumn: val));
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 3,
+              child: _buildDropdown(
+                label: 'Değer (Y)',
+                value: widget.config.valueColumn,
+                items: widget.result.columns,
+                onChanged: (val) {
+                  if (val != null) {
+                    widget.onConfigChanged(widget.config.copyWith(valueColumn: val));
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Grafik Türü:',
+                    style: GoogleFonts.dmSans(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      _buildTypeChip('Çubuk', ChartType.bar, Icons.bar_chart_rounded),
+                      const SizedBox(width: 6),
+                      _buildTypeChip('Çizgi', ChartType.line, Icons.show_chart_rounded),
+                      const SizedBox(width: 6),
+                      _buildTypeChip('Pasta', ChartType.pie, Icons.pie_chart_outline_rounded),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: EdgeInsets.all(isLandscape ? 10 : 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(6),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withAlpha(5),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -162,7 +235,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
               ),
             ],
           ),
-          SizedBox(height: isLandscape ? 6 : 10),
+          const SizedBox(height: 8),
           Row(
             children: [
               Text(
@@ -174,9 +247,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 child: Row(
                   children: [
                     _buildTypeChip('Çubuk', ChartType.bar, Icons.bar_chart_rounded),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     _buildTypeChip('Çizgi', ChartType.line, Icons.show_chart_rounded),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     _buildTypeChip('Pasta', ChartType.pie, Icons.pie_chart_outline_rounded),
                   ],
                 ),
@@ -492,8 +565,166 @@ class _InteractiveChartState extends State<InteractiveChart> {
         ? (touchedPoint.value / total * 100)
         : null;
 
+    final pieWidget = SizedBox(
+      width: isLandscape ? 170 : double.infinity,
+      height: isLandscape ? 170 : 185,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          PieChart(
+            PieChartData(
+              pieTouchData: PieTouchData(
+                touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                  setState(() {
+                    if (!event.isInterestedForInteractions ||
+                        pieTouchResponse == null ||
+                        pieTouchResponse.touchedSection == null) {
+                      return;
+                    }
+                    _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                  });
+                },
+              ),
+              borderData: FlBorderData(show: false),
+              sectionsSpace: 2,
+              centerSpaceRadius: isLandscape ? 30 : 35,
+              sections: List.generate(points.length, (idx) {
+                final isTouched = idx == _touchedIndex;
+                final p = points[idx];
+                final pct = total > 0 ? (p.value / total * 100) : 0.0;
+                final radius = isTouched ? (isLandscape ? 38.0 : 42.0) : (isLandscape ? 30.0 : 35.0);
+
+                return PieChartSectionData(
+                  color: _getColor(idx, points.length),
+                  value: p.value > 0 ? p.value : 0.001,
+                  title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
+                  radius: radius,
+                  titleStyle: GoogleFonts.spaceGrotesk(
+                    fontSize: isTouched ? 11 : 9,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                );
+              }),
+            ),
+          ),
+
+          // Center Information Hole
+          if (touchedPoint != null)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  touchedPoint.label.length > 9
+                      ? '${touchedPoint.label.substring(0, 8)}…'
+                      : touchedPoint.label,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  '${touchedPct!.toStringAsFixed(1)}%',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              '${points.length} Dilim',
+              style: GoogleFonts.dmSans(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textMuted,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    final legendWidget = Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      alignment: isLandscape ? WrapAlignment.start : WrapAlignment.center,
+      children: List.generate(points.length, (idx) {
+        final p = points[idx];
+        final color = _getColor(idx, points.length);
+        final isTouched = idx == _touchedIndex;
+
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _touchedIndex = (_touchedIndex == idx) ? null : idx;
+            });
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isTouched ? color.withAlpha(25) : AppColors.cardMuted,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isTouched ? color : AppColors.border,
+                width: isTouched ? 1.5 : 0.8,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  p.label,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    fontWeight: isTouched ? FontWeight.w700 : FontWeight.w500,
+                    color: isTouched ? AppColors.textPrimary : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+
+    if (isLandscape) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            pieWidget,
+            const SizedBox(width: 14),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: legendWidget,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -502,146 +733,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Bounded Pie Chart container that NEVER overflows into controls
-          SizedBox(
-            height: isLandscape ? 170 : 210,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                PieChart(
-                  PieChartData(
-                    pieTouchData: PieTouchData(
-                      touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                        setState(() {
-                          if (!event.isInterestedForInteractions ||
-                              pieTouchResponse == null ||
-                              pieTouchResponse.touchedSection == null) {
-                            return;
-                          }
-                          _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                        });
-                      },
-                    ),
-                    borderData: FlBorderData(show: false),
-                    sectionsSpace: 2,
-                    centerSpaceRadius: isLandscape ? 30 : 38,
-                    sections: List.generate(points.length, (idx) {
-                      final isTouched = idx == _touchedIndex;
-                      final p = points[idx];
-                      final pct = total > 0 ? (p.value / total * 100) : 0.0;
-                      final radius = isTouched ? (isLandscape ? 40.0 : 48.0) : (isLandscape ? 32.0 : 40.0);
-
-                      return PieChartSectionData(
-                        color: _getColor(idx, points.length),
-                        value: p.value > 0 ? p.value : 0.001,
-                        title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
-                        radius: radius,
-                        titleStyle: GoogleFonts.spaceGrotesk(
-                          fontSize: isTouched ? 12 : 10,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-
-                // Center Information Hole
-                if (touchedPoint != null)
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        touchedPoint.label.length > 9
-                            ? '${touchedPoint.label.substring(0, 8)}…'
-                            : touchedPoint.label,
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        '${touchedPct!.toStringAsFixed(1)}%',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  Text(
-                    '${points.length} Dilim',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Scrollable Distinct Legend
+          pieWidget,
+          const SizedBox(height: 10),
           Container(
-            constraints: BoxConstraints(maxHeight: isLandscape ? 70 : 110),
+            constraints: const BoxConstraints(maxHeight: 110),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                alignment: WrapAlignment.center,
-                children: List.generate(points.length, (idx) {
-                  final p = points[idx];
-                  final color = _getColor(idx, points.length);
-                  final isTouched = idx == _touchedIndex;
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _touchedIndex = (_touchedIndex == idx) ? null : idx;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isTouched ? color.withAlpha(25) : AppColors.cardMuted,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isTouched ? color : AppColors.border,
-                          width: isTouched ? 1.5 : 0.8,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            p.label,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 11,
-                              fontWeight: isTouched ? FontWeight.w700 : FontWeight.w500,
-                              color: isTouched ? AppColors.textPrimary : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ),
+              child: legendWidget,
             ),
           ),
         ],
