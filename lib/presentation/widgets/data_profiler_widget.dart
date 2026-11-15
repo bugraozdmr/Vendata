@@ -59,7 +59,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
     }
   }
 
-  void _loadProfile() {
+  Future<void> _loadProfile() async {
     final schema = _currentTableSchema;
     if (schema == null) {
       setState(() => _profile = null);
@@ -67,8 +67,10 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
     }
 
     setState(() => _isLoading = true);
+    await Future.delayed(const Duration(milliseconds: 150));
     try {
       final p = widget.profilerService.profileTable(schema);
+      if (!mounted) return;
       setState(() {
         _profile = p;
         _isLoading = false;
@@ -82,7 +84,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
         }
       });
     } catch (_) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -102,6 +104,34 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
           child: Text(
             'Analiz edilecek tablo yok.',
             style: GoogleFonts.dmSans(color: AppColors.textMuted, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    if (_isLoading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accent),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Tablo Analiz Ediliyor...',
+                style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Sütun tipleri ve istatistikler taranıyor',
+                style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+              ),
+            ],
           ),
         ),
       );

@@ -82,6 +82,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
     required String fileName,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
+    await Future.delayed(const Duration(milliseconds: 200));
     try {
       final file = File(filePath);
       final bytes = await file.readAsBytes();
@@ -151,14 +152,20 @@ class TablesNotifier extends StateNotifier<TablesState> {
     refreshTables();
   }
 
-  void dropTable(String tableName) {
+  Future<void> dropTable(String tableName) async {
+    state = state.copyWith(isLoading: true);
+    await Future.delayed(const Duration(milliseconds: 150));
     _engine.dropTable(tableName);
     refreshTables();
+    state = state.copyWith(isLoading: false);
   }
 
-  void clearAll() {
+  Future<void> clearAll() async {
+    state = state.copyWith(isLoading: true);
+    await Future.delayed(const Duration(milliseconds: 150));
     _engine.clearAll();
     refreshTables();
+    state = state.copyWith(isLoading: false);
   }
 }
 
@@ -253,12 +260,16 @@ class QueryNotifier extends StateNotifier<QueryState> {
     state = state.copyWith(sql: sql);
   }
 
-  void runQuery([String? customSql, String? tableName]) {
+  Future<void> runQuery([String? customSql, String? tableName]) async {
     final queryToRun = (customSql ?? state.sql).trim();
     if (queryToRun.isEmpty) return;
 
     final targetTable = tableName ?? state.activeTable;
     state = state.copyWith(isExecuting: true, sql: queryToRun);
+
+    // Yield to the event loop so the UI frame with the spinner renders immediately!
+    await Future.delayed(const Duration(milliseconds: 300));
+
     final result = _engine.executeQuery(queryToRun, tableName: targetTable);
 
     final updatedQueries = _engine.getSavedQueries(tableName: targetTable);

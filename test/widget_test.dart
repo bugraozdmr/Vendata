@@ -10,10 +10,10 @@ void main() {
       ),
     );
 
-    expect(find.text('ven'), findsOneWidget);
+    expect(find.text('Ven'), findsOneWidget);
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Veriler'), findsOneWidget);
+    expect(find.text('Vendata'), findsOneWidget);
   });
 }

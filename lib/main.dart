@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/database_engine.dart';
 import 'presentation/providers/database_provider.dart';
@@ -8,6 +9,7 @@ import 'presentation/screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.init();
 
   final appDocDir = await getApplicationDocumentsDirectory();
   final dbPath = '${appDocDir.path}/vendata_storage.db';
@@ -29,7 +31,7 @@ class VenDataApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VenData',
+      title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const SplashScreen(),

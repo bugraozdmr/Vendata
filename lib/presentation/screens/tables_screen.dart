@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/file_helper.dart';
 import '../../domain/models/recent_file.dart';
@@ -49,31 +50,141 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Veriler',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -1.0,
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF15161A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border, width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.asset(
+                          'assets/logo.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      AppConfig.appName,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -1.0,
+                      ),
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: tablesState.isLoading ? null : _pickFile,
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 42,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: tablesState.isLoading ? AppColors.textMuted : AppColors.accent,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: tablesState.isLoading
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: AppColors.accent.withAlpha(45),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (tablesState.isLoading)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        else ...[
+                          const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Dosya Ekle',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-                if (tablesState.tables.isNotEmpty)
-                  _buildIconBtn(
-                    Icons.delete_sweep_rounded,
-                    AppColors.error,
-                    () => _confirmClearAll(context),
-                  ),
               ],
             ),
             if (tablesState.isLoading) ...[
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: const LinearProgressIndicator(
-                  color: AppColors.accent,
-                  backgroundColor: AppColors.cardMuted,
-                  minHeight: 3,
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.accent.withAlpha(60), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withAlpha(18),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'İşlem Yapılıyor...',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Dosya işleniyor ve SQLite tabloları güncelleniyor',
+                            style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -81,13 +192,11 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               const SizedBox(height: 12),
               _buildErrorBanner(tablesState.errorMessage!),
             ],
-            const SizedBox(height: 20),
-            _buildUploadCard(),
             if (tablesState.recentFiles.isNotEmpty) ...[
-              const SizedBox(height: 24),
+              const SizedBox(height: 22),
               _buildRecentFiles(tablesState.recentFiles),
             ],
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Text(
@@ -128,20 +237,6 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     );
   }
 
-  Widget _buildIconBtn(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: color.withAlpha(15),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(icon, size: 20, color: color),
-      ),
-    );
-  }
-
   Widget _buildErrorBanner(String error) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -161,44 +256,53 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     );
   }
 
-  Widget _buildUploadCard() {
-    return GestureDetector(
-      onTap: _pickFile,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 16, offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.folder_open_rounded, size: 48, color: AppColors.textMuted.withAlpha(100)),
+          const SizedBox(height: 14),
+          Text(
+            'Henüz Tablo Eklenmedi',
+            style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Başlamak için sağ üstteki butondan veya aşağıdan Excel, CSV ya da SQL dosyanızı seçin.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _pickFile,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.accentLight,
-                borderRadius: BorderRadius.circular(20),
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.add_rounded, color: AppColors.accent, size: 28),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Dosya Yükle',
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Dosya Seç',
+                    style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Excel, CSV veya SQL',
-              style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -281,34 +385,6 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.folder_open_rounded, size: 48, color: AppColors.textMuted.withAlpha(100)),
-          const SizedBox(height: 14),
-          Text(
-            'Tablo Yok',
-            style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Başlamak için dosya yükleyin.',
-            style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
-          ),
-        ],
       ),
     );
   }
@@ -728,36 +804,5 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     );
   }
 
-  void _confirmClearAll(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('Tümünü Temizle', style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700)),
-        content: Text(
-          'Tüm tablolar silinecektir. Emin misiniz?',
-          style: GoogleFonts.dmSans(fontSize: 14, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('İptal', style: GoogleFonts.dmSans(fontWeight: FontWeight.w600)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref.read(tablesProvider.notifier).clearAll();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text('Sil', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-  }
+
 }

@@ -26,6 +26,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
   int _queryMode = 0;
   int _resultType = 0;
   String? _activeTable;
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -76,7 +77,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     }
   }
 
-  void _runQuery([String? customSql, bool switchTab = true, String? tableName]) {
+  Future<void> _runQuery([String? customSql, bool switchTab = true, String? tableName]) async {
     final sql = (customSql ?? _sqlController.text).trim();
     if (sql.isEmpty) return;
     _sqlController.text = sql;
@@ -86,7 +87,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     }
 
     final target = tableName ?? _activeTable;
-    ref.read(queryProvider.notifier).runQuery(sql, target);
+    await ref.read(queryProvider.notifier).runQuery(sql, target);
   }
 
   @override
@@ -106,14 +107,42 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'SQL',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -1.0,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF15161A),
+                          borderRadius: BorderRadius.circular(11),
+                          border: Border.all(color: AppColors.border, width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(12),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'SQL',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -1.0,
+                        ),
+                      ),
+                    ],
                   ),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -777,14 +806,32 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               _buildMiniToggle('Grafik', Icons.bar_chart_rounded, _resultType == 1, () => setState(() => _resultType = 1)),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => ExportHelper.shareAsExcel(result),
+                onTap: _isExporting
+                    ? null
+                    : () async {
+                        setState(() => _isExporting = true);
+                        try {
+                          await ExportHelper.shareAsExcel(result);
+                        } finally {
+                          if (mounted) setState(() => _isExporting = false);
+                        }
+                      },
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: AppColors.successWash,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.download_rounded, size: 16, color: AppColors.success),
+                  child: _isExporting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.success,
+                          ),
+                        )
+                      : const Icon(Icons.download_rounded, size: 16, color: AppColors.success),
                 ),
               ),
             ],

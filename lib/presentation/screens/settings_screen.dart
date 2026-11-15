@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/file_helper.dart';
 import '../../domain/models/saved_query.dart';
@@ -36,14 +37,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
           physics: const BouncingScrollPhysics(),
           children: [
-            Text(
-              'Ayarlar',
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                letterSpacing: -1.0,
-              ),
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF15161A),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: AppColors.border, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(12),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Ayarlar',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -1.0,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             _buildStorageSection(dbSizeBytes, totalTables, totalRows),
@@ -51,6 +77,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildQueryHistory(queryState),
             const SizedBox(height: 28),
             _buildDangerZone(),
+            const SizedBox(height: 32),
+            Center(
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF15161A),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border, width: 1),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 10, offset: const Offset(0, 3)),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(13),
+                      child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${AppConfig.appName} Local Studio',
+                    style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'v${AppConfig.appVersion} • SQLite 3.5.2 • %100 Çevrimdışı',
+                    style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
