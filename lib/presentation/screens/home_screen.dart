@@ -28,37 +28,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _initQuickActions() {
-    _quickActions.initialize((String shortcutType) {
-      if (!mounted) return;
-      if (shortcutType == 'action_new_query') {
-        setState(() {
-          _selectedTableForQuery = null;
-          _currentIndex = 1;
-        });
-      } else if (shortcutType == 'action_upload_file') {
-        setState(() => _currentIndex = 0);
-      } else if (shortcutType == 'action_connections') {
-        setState(() => _currentIndex = 2);
-      }
-    });
+    try {
+      _quickActions.initialize((String shortcutType) {
+        if (!mounted) return;
+        if (shortcutType == 'action_new_query') {
+          setState(() {
+            _selectedTableForQuery = null;
+            _currentIndex = 1;
+          });
+        } else if (shortcutType == 'action_upload_file') {
+          setState(() => _currentIndex = 0);
+        } else if (shortcutType == 'action_connections') {
+          setState(() => _currentIndex = 2);
+        }
+      });
 
-    _quickActions.setShortcutItems(<ShortcutItem>[
-      const ShortcutItem(
-        type: 'action_new_query',
-        localizedTitle: 'Yeni Sorgu',
-        icon: 'ic_shortcut_query',
-      ),
-      const ShortcutItem(
-        type: 'action_upload_file',
-        localizedTitle: 'Dosya Yükle',
-        icon: 'ic_shortcut_file',
-      ),
-      const ShortcutItem(
-        type: 'action_connections',
-        localizedTitle: 'Sunucu Bağlantıları',
-        icon: 'ic_shortcut_server',
-      ),
-    ]);
+      _quickActions.setShortcutItems(<ShortcutItem>[
+        const ShortcutItem(
+          type: 'action_new_query',
+          localizedTitle: 'Yeni Sorgu',
+        ),
+        const ShortcutItem(
+          type: 'action_upload_file',
+          localizedTitle: 'Dosya Yükle',
+        ),
+        const ShortcutItem(
+          type: 'action_connections',
+          localizedTitle: 'Sunucu Bağlantıları',
+        ),
+      ]).catchError((_) {});
+    } catch (_) {}
   }
 
   void _navigateToQuery(String tableName) {
