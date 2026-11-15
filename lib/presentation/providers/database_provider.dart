@@ -6,11 +6,13 @@ import '../../data/datasources/csv_parser.dart';
 import '../../data/datasources/excel_parser.dart';
 import '../../data/services/data_profiler_service.dart';
 import '../../data/services/database_engine.dart';
+import '../../data/services/db_session.dart';
 import '../../domain/models/chart_config.dart';
 import '../../domain/models/query_result.dart';
 import '../../domain/models/recent_file.dart';
 import '../../domain/models/saved_query.dart';
 import '../../domain/models/table_schema.dart';
+import 'connection_provider.dart';
 
 final databaseEngineProvider = Provider<DatabaseEngine>((ref) {
   final engine = DatabaseEngine();
@@ -19,8 +21,8 @@ final databaseEngineProvider = Provider<DatabaseEngine>((ref) {
 });
 
 final dataProfilerServiceProvider = Provider<DataProfilerService>((ref) {
-  final engine = ref.watch(databaseEngineProvider);
-  return DataProfilerService(engine);
+  final session = ref.watch(sessionProvider);
+  return DataProfilerService(session);
 });
 
 class TablesState {
@@ -29,6 +31,8 @@ class TablesState {
   final bool isLoading;
   final String? errorMessage;
   final String? lastImportedFileName;
+  final bool isRemote;
+  final String connectionLabel;
 
   const TablesState({
     this.tables = const [],
@@ -36,6 +40,8 @@ class TablesState {
     this.isLoading = false,
     this.errorMessage,
     this.lastImportedFileName,
+    this.isRemote = false,
+    this.connectionLabel = 'Yerel (SQLite)',
   });
 
   TablesState copyWith({
@@ -44,36 +50,59 @@ class TablesState {
     bool? isLoading,
     String? errorMessage,
     String? lastImportedFileName,
+    bool? isRemote,
+    String? connectionLabel,
+    bool clearError = false,
   }) {
     return TablesState(
       tables: tables ?? this.tables,
       recentFiles: recentFiles ?? this.recentFiles,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       lastImportedFileName: lastImportedFileName ?? this.lastImportedFileName,
+      isRemote: isRemote ?? this.isRemote,
+      connectionLabel: connectionLabel ?? this.connectionLabel,
     );
   }
 }
 
 class TablesNotifier extends StateNotifier<TablesState> {
   final DatabaseEngine _engine;
+  final DbSession _session;
 
-  TablesNotifier(this._engine) : super(const TablesState()) {
+  TablesNotifier(this._engine, this._session)
+      : super(TablesState(
+          isRemote: _session.isRemote,
+          connectionLabel: _session.label,
+        )) {
     refreshTables();
   }
 
-  void refreshTables() {
+  Future<void> refreshTables() async {
+    state = state.copyWith(
+      isLoading: true,
+      isRemote: _session.isRemote,
+      connectionLabel: _session.label,
+      clearError: true,
+    );
     try {
-      final tables = _engine.getTables();
+      final tables = await _session.getTables();
       final recentFiles = _engine.getRecentFiles();
       state = state.copyWith(
         tables: tables,
         recentFiles: recentFiles,
         isLoading: false,
-        errorMessage: null,
+        isRemote: _session.isRemote,
+        connectionLabel: _session.label,
+        clearError: true,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+        isRemote: _session.isRemote,
+        connectionLabel: _session.label,
+      );
     }
   }
 
@@ -124,7 +153,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
         ),
       );
 
-      refreshTables();
+      await refreshTables();
       state = state.copyWith(lastImportedFileName: fileName);
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
@@ -143,8 +172,8 @@ class TablesNotifier extends StateNotifier<TablesState> {
   }
 
   void markTableAccessed(String tableName) {
+    if (_session.isRemote) return;
     _engine.markTableAccessed(tableName);
-    refreshTables();
   }
 
   void deleteRecentFile(int id) {
@@ -153,10 +182,11 @@ class TablesNotifier extends StateNotifier<TablesState> {
   }
 
   Future<void> dropTable(String tableName) async {
+    if (_session.isRemote) return;
     state = state.copyWith(isLoading: true);
     await Future.delayed(const Duration(milliseconds: 150));
     _engine.dropTable(tableName);
-    refreshTables();
+    await refreshTables();
     state = state.copyWith(isLoading: false);
   }
 
@@ -164,14 +194,15 @@ class TablesNotifier extends StateNotifier<TablesState> {
     state = state.copyWith(isLoading: true);
     await Future.delayed(const Duration(milliseconds: 150));
     _engine.clearAll();
-    refreshTables();
+    await refreshTables();
     state = state.copyWith(isLoading: false);
   }
 }
 
 final tablesProvider = StateNotifierProvider<TablesNotifier, TablesState>((ref) {
   final engine = ref.watch(databaseEngineProvider);
-  return TablesNotifier(engine);
+  final session = ref.watch(sessionProvider);
+  return TablesNotifier(engine, session);
 });
 
 class QueryState {
@@ -213,9 +244,10 @@ class QueryState {
 
 class QueryNotifier extends StateNotifier<QueryState> {
   final DatabaseEngine _engine;
+  final DbSession _session;
   final Ref _ref;
 
-  QueryNotifier(this._engine, this._ref)
+  QueryNotifier(this._engine, this._session, this._ref)
       : super(
           QueryState(
             result: QueryResult.empty(),
@@ -270,7 +302,7 @@ class QueryNotifier extends StateNotifier<QueryState> {
     // Yield to the event loop so the UI frame with the spinner renders immediately!
     await Future.delayed(const Duration(milliseconds: 300));
 
-    final result = _engine.executeQuery(queryToRun, tableName: targetTable);
+    final result = await _session.execute(queryToRun, tableName: targetTable);
 
     final updatedQueries = _engine.getSavedQueries(tableName: targetTable);
     final updatedHistory = _engine.getQueryHistory(tableName: targetTable);
@@ -295,7 +327,8 @@ class QueryNotifier extends StateNotifier<QueryState> {
 
 final queryProvider = StateNotifierProvider<QueryNotifier, QueryState>((ref) {
   final engine = ref.watch(databaseEngineProvider);
-  return QueryNotifier(engine, ref);
+  final session = ref.watch(sessionProvider);
+  return QueryNotifier(engine, session, ref);
 });
 
 class ChartConfigNotifier extends StateNotifier<ChartConfig?> {

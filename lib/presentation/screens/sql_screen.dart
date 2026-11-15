@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/export_helper.dart';
 import '../../domain/models/chart_config.dart';
 import '../../domain/models/query_result.dart';
+import '../providers/connection_provider.dart';
 import '../providers/database_provider.dart';
 import '../widgets/data_grid_table.dart';
 import '../widgets/data_profiler_widget.dart';
@@ -12,6 +13,7 @@ import '../widgets/interactive_chart.dart';
 import '../widgets/query_shortcuts.dart';
 import '../widgets/saved_queries_sheet.dart';
 import '../widgets/visual_query_builder.dart';
+import 'fullscreen_table_screen.dart';
 
 class QueryTabModel {
   final String id;
@@ -64,8 +66,11 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
   void initState() {
     super.initState();
     final initialTable = widget.targetTable;
+    final quotedInitial = initialTable != null && initialTable.isNotEmpty
+        ? ref.read(sessionProvider).quoteIdentifier(initialTable)
+        : '';
     final initialSql = (initialTable != null && initialTable.isNotEmpty)
-        ? 'SELECT * FROM "$initialTable" LIMIT 50;'
+        ? 'SELECT * FROM $quotedInitial LIMIT 50;'
         : '';
     final initialTitle = (initialTable != null && initialTable.isNotEmpty)
         ? initialTable
@@ -109,7 +114,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
   void _addNewTab({String? tableName, String? initialSql}) {
     final count = _tabCounter++;
     final sql = (tableName != null && tableName.isNotEmpty)
-        ? 'SELECT * FROM "$tableName" LIMIT 50;'
+        ? 'SELECT * FROM ${ref.read(sessionProvider).quoteIdentifier(tableName)} LIMIT 50;'
         : (initialSql ?? '');
     final title = (tableName != null && tableName.isNotEmpty)
         ? tableName
@@ -220,8 +225,8 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     await Future.delayed(const Duration(milliseconds: 250));
 
     final target = tableName ?? tab.activeTable;
-    final engine = ref.read(databaseEngineProvider);
-    final queryResult = engine.executeQuery(sql, tableName: target);
+    final session = ref.read(sessionProvider);
+    final queryResult = await session.execute(sql, tableName: target);
 
     ChartConfig? autoChart;
     if (!queryResult.hasError && queryResult.rows.isNotEmpty) {
@@ -250,6 +255,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final tablesState = ref.watch(tablesProvider);
     final currentTab = _currentTab;
     final hasResults = currentTab.result != null && !currentTab.result!.hasError && currentTab.result!.rows.isNotEmpty;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       body: SafeArea(
@@ -258,18 +264,53 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           children: [
             // Top Header: Clean typography without logo
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: EdgeInsets.fromLTRB(20, isLandscape ? 8 : 16, 20, 0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'SQL',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -1.0,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        'SQL',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: isLandscape ? 24 : 32,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -1.0,
+                        ),
+                      ),
+                      if (tablesState.isRemote) ...[
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.successWash,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.success.withAlpha(60)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.dns_rounded, size: 12, color: AppColors.success),
+                              const SizedBox(width: 4),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 120),
+                                child: Text(
+                                  tablesState.connectionLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -568,7 +609,8 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                       onTap: () {
                         setState(() {
                           currentTab.activeTable = t.name;
-                          currentTab.sqlController.text = 'SELECT * FROM "${t.name}" LIMIT 50;';
+                          currentTab.sqlController.text =
+                              'SELECT * FROM ${ref.read(sessionProvider).quoteIdentifier(t.name)} LIMIT 50;';
                           if (currentTab.title.startsWith('Sorgu ')) {
                             currentTab.title = t.name;
                           }
@@ -656,7 +698,8 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               } else {
                 setState(() {
                   currentTab.activeTable = val;
-                  currentTab.sqlController.text = 'SELECT * FROM "$val" LIMIT 50;';
+                  currentTab.sqlController.text =
+                      'SELECT * FROM ${ref.read(sessionProvider).quoteIdentifier(val)} LIMIT 50;';
                   currentTab.title = val;
                 });
                 ref.read(queryProvider.notifier).setActiveTable(val);
@@ -834,9 +877,10 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
 
   Widget _buildManualEditor(TablesState tablesState, QueryTabModel tab, QueryState queryState) {
     final availableTableNames = tablesState.tables.map((t) => t.name).toList();
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+      padding: EdgeInsets.fromLTRB(20, 4, 20, isLandscape ? 56 : 100),
       child: Column(
         children: [
           QueryShortcuts(
@@ -966,6 +1010,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
 
   Widget _buildFullResultsView(QueryResult? result, ChartConfig? chartConfig, bool isExecuting) {
     final currentTab = _currentTab;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     if (isExecuting) {
       return Center(
@@ -1133,26 +1178,67 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
                   color: AppColors.cardMuted,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${result.rowCount} satır  •  ${result.executionTimeMs} ms',
-                  style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                  isLandscape
+                      ? '${result.rowCount} satır  •  ${result.executionTimeMs} ms'
+                      : '${result.rowCount} satır',
+                  style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                 ),
               ),
               const Spacer(),
-              _buildMiniToggle('Tablo', Icons.table_rows_rounded, currentTab.resultType == 0, () => setState(() => currentTab.resultType = 0)),
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: AppColors.cardMuted,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildMiniToggle('Tablo', Icons.table_rows_rounded, currentTab.resultType == 0, () => setState(() => currentTab.resultType = 0)),
+                    _buildMiniToggle('Grafik', Icons.bar_chart_rounded, currentTab.resultType == 1, () => setState(() => currentTab.resultType = 1)),
+                  ],
+                ),
+              ),
               const SizedBox(width: 6),
-              _buildMiniToggle('Grafik', Icons.bar_chart_rounded, currentTab.resultType == 1, () => setState(() => currentTab.resultType = 1)),
-              const SizedBox(width: 8),
               GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => FullscreenTableScreen(
+                        result: result,
+                        tableName: currentTab.activeTable,
+                      ),
+                    ),
+                  );
+                },
+                child: Tooltip(
+                  message: 'Tam Ekran Büyüt',
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardMuted,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: const Icon(Icons.open_in_full_rounded, size: 15, color: AppColors.textPrimary),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: _isExporting
                     ? null
                     : () async {
@@ -1163,22 +1249,25 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                           if (mounted) setState(() => _isExporting = false);
                         }
                       },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.successWash,
-                    borderRadius: BorderRadius.circular(10),
+                child: Tooltip(
+                  message: 'Excel Olarak İndir',
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.successWash,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: _isExporting
+                        ? const SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.success,
+                            ),
+                          )
+                        : const Icon(Icons.download_rounded, size: 15, color: AppColors.success),
                   ),
-                  child: _isExporting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.success,
-                          ),
-                        )
-                      : const Icon(Icons.download_rounded, size: 16, color: AppColors.success),
                 ),
               ),
             ],
@@ -1187,7 +1276,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
         const Divider(height: 1, color: AppColors.border),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 80),
+            padding: EdgeInsets.only(bottom: isLandscape ? 56 : 80),
             child: currentTab.resultType == 0
                 ? DataGridTable(result: result)
                 : (currentTab.chartConfig == null
@@ -1216,21 +1305,22 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
           color: isActive ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: isActive ? Colors.white : AppColors.textMuted),
+            Icon(icon, size: 13, color: isActive ? Colors.white : AppColors.textMuted),
             const SizedBox(width: 4),
             Text(
               label,
               style: GoogleFonts.dmSans(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: isActive ? Colors.white : AppColors.textMuted,
               ),

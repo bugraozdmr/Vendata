@@ -1,6 +1,16 @@
 class SqlSanitizer {
   SqlSanitizer._();
 
+  /// Quote character used when escaping identifiers in generated SQL.
+  ///
+  /// Vendata only ever has one active session at a time, so this follows the
+  /// active backend (PostgreSQL/SQLite use `"`, MySQL uses a backtick).
+  static String identifierQuote = '"';
+
+  static void setIdentifierQuote(String quote) {
+    identifierQuote = quote;
+  }
+
   static String sanitizeTableName(String name) {
     var clean = name.trim().replaceAll(RegExp(r'[^\w\d_]'), '_');
     if (clean.isEmpty) {
@@ -47,7 +57,8 @@ class SqlSanitizer {
   }
 
   static String escapeIdentifier(String name) {
-    return '"${name.replaceAll('"', '""')}"';
+    final quote = identifierQuote;
+    return '$quote${name.replaceAll(quote, '$quote$quote')}$quote';
   }
 }
 

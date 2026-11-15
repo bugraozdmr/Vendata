@@ -45,6 +45,8 @@ dependencies:
   share_plus: ^13.3.1
   intl: ^0.20.3
   google_fonts: ^8.2.1
+  postgres: ^3.6.0
+  mysql_client: ^0.0.27
 
 dev_dependencies:
   flutter_test:

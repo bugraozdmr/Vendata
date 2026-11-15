@@ -1,6 +1,6 @@
 import '../../core/utils/sql_sanitizer.dart';
 import '../../domain/models/table_schema.dart';
-import 'database_engine.dart';
+import 'db_session.dart';
 
 class ColumnProfile {
   final String name;
@@ -38,25 +38,25 @@ class TableProfile {
 }
 
 class DataProfilerService {
-  final DatabaseEngine _engine;
+  final DbSession _session;
 
-  DataProfilerService(this._engine);
+  DataProfilerService(this._session);
 
-  DatabaseEngine get engine => _engine;
+  DbSession get session => _session;
 
-  List<String> getDistinctColumnValues(String tableName, String colName, {int limit = 8}) {
+  Future<List<String>> getDistinctColumnValues(String tableName, String colName, {int limit = 8}) async {
     try {
       final colEsc = SqlSanitizer.escapeIdentifier(colName);
       final tableEsc = SqlSanitizer.escapeIdentifier(tableName);
       final sql = 'SELECT DISTINCT $colEsc FROM $tableEsc WHERE $colEsc IS NOT NULL LIMIT $limit;';
-      final res = _engine.executeQuery(sql);
+      final res = await _session.execute(sql);
       return res.rows.map((r) => r.first?.toString() ?? 'Bilinmeyen').toList();
     } catch (_) {
       return [];
     }
   }
 
-  TableProfile profileTable(TableSchema schema) {
+  Future<TableProfile> profileTable(TableSchema schema) async {
     final tableName = schema.name;
     final totalRows = schema.rowCount;
     final columnProfiles = <ColumnProfile>[];
@@ -70,7 +70,7 @@ class DataProfilerService {
 
       try {
         final query = 'SELECT ($totalRows - COUNT($colEsc)) AS null_cnt, COUNT(DISTINCT $colEsc) AS dist_cnt FROM $tableEsc;';
-        final res = _engine.executeQuery(query);
+        final res = await _session.execute(query);
         if (res.rows.isNotEmpty) {
           final row = res.rows.first;
           nullCount = (row[0] as num?)?.toInt() ?? 0;
@@ -101,7 +101,7 @@ class DataProfilerService {
           HAVING cnt > 1
         );
       ''';
-      final dupRes = _engine.executeQuery(dupQuery);
+      final dupRes = await _session.execute(dupQuery);
       if (dupRes.rows.isNotEmpty) {
         duplicateCount = (dupRes.rows.first[0] as num?)?.toInt() ?? 0;
       }

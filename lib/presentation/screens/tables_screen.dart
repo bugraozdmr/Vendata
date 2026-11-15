@@ -10,6 +10,7 @@ import '../../core/utils/file_helper.dart';
 import '../../domain/models/recent_file.dart';
 import '../../domain/models/saved_query.dart';
 import '../../domain/models/table_schema.dart';
+import '../providers/connection_provider.dart';
 import '../providers/database_provider.dart';
 
 class TablesScreen extends ConsumerStatefulWidget {
@@ -87,56 +88,61 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                     ),
                   ],
                 ),
-                GestureDetector(
-                  onTap: tablesState.isLoading ? null : _pickFile,
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 42,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: tablesState.isLoading ? AppColors.textMuted : AppColors.accent,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: tablesState.isLoading
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: AppColors.accent.withAlpha(45),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
+                if (!tablesState.isRemote)
+                  GestureDetector(
+                    onTap: tablesState.isLoading ? null : _pickFile,
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: tablesState.isLoading ? AppColors.textMuted : AppColors.accent,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: tablesState.isLoading
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: AppColors.accent.withAlpha(45),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (tablesState.isLoading)
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
                               ),
-                            ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (tablesState.isLoading)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: Colors.white,
+                            )
+                          else ...[
+                            const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Dosya Ekle',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
-                          )
-                        else ...[
-                          const Icon(Icons.add_rounded, size: 20, color: Colors.white),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Dosya Ekle',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
+            if (tablesState.isRemote) ...[
+              const SizedBox(height: 14),
+              _buildRemoteBanner(tablesState),
+            ],
             if (tablesState.isLoading) ...[
               const SizedBox(height: 14),
               Container(
@@ -250,6 +256,81 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(error, style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemoteBanner(TablesState tablesState) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.successWash,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.success.withAlpha(60), width: 1.2),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.dns_rounded, size: 18, color: AppColors.success),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Uzak bağlantı aktif',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  tablesState.connectionLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              ref.read(connectionsProvider.notifier).disconnect();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.link_off_rounded, size: 14, color: AppColors.error),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Kes',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -395,6 +476,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
         : (table.createdAt != null ? DateFormat('dd.MM.yyyy').format(table.createdAt!) : '');
 
     final queryState = ref.watch(queryProvider);
+    final isRemote = ref.watch(tablesProvider).isRemote;
     final hasStarredQueries = queryState.savedQueries.any((q) => q.tableName == table.name && q.isFavorite);
 
     return Container(
@@ -463,15 +545,17 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => ref.read(tablesProvider.notifier).dropTable(table.name),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted.withAlpha(160)),
+          if (!isRemote) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => ref.read(tablesProvider.notifier).dropTable(table.name),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted.withAlpha(160)),
+              ),
             ),
-          ),
+          ],
           const SizedBox(width: 6),
           GestureDetector(
             behavior: HitTestBehavior.opaque,

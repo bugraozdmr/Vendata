@@ -69,7 +69,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 150));
     try {
-      final p = widget.profilerService.profileTable(schema);
+      final p = await widget.profilerService.profileTable(schema);
       if (!mounted) return;
       setState(() {
         _profile = p;
@@ -524,11 +524,11 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
     );
   }
 
-  void _executePivot(TableSchema schema) {
+  Future<void> _executePivot(TableSchema schema) async {
     if (_pivotRowCol == null || _pivotCol == null || _pivotValCol == null) return;
 
     try {
-      final distinctVals = widget.profilerService.getDistinctColumnValues(schema.name, _pivotCol!);
+      final distinctVals = await widget.profilerService.getDistinctColumnValues(schema.name, _pivotCol!);
       if (distinctVals.isEmpty) return;
 
       final pivotSql = widget.profilerService.generatePivotSql(

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:sqlite3/sqlite3.dart';
 import '../../core/utils/sql_sanitizer.dart';
+import '../../domain/models/db_connection.dart';
 import '../../domain/models/query_result.dart';
 import '../../domain/models/recent_file.dart';
 import '../../domain/models/saved_query.dart';
@@ -55,6 +56,21 @@ class DatabaseEngine {
         is_favorite INTEGER DEFAULT 0,
         execution_time_ms INTEGER DEFAULT 0,
         row_count INTEGER DEFAULT 0
+      );
+    ''');
+
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS _vendata_connections (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        host TEXT NOT NULL,
+        port INTEGER NOT NULL,
+        database_name TEXT,
+        username TEXT,
+        password TEXT,
+        use_ssl INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
       );
     ''');
 
@@ -255,6 +271,22 @@ class DatabaseEngine {
     } catch (_) {}
   }
 
+  void recordQuery(
+    String sql, {
+    String? tableName,
+    String? sourceFile,
+    int executionTimeMs = 0,
+    int rowCount = 0,
+  }) {
+    _logQuery(
+      sql,
+      tableName: tableName,
+      sourceFile: sourceFile,
+      executionTimeMs: executionTimeMs,
+      rowCount: rowCount,
+    );
+  }
+
   List<SavedQuery> getSavedQueries({String? tableName, bool? onlyFavorites, int limit = 50}) {
     try {
       var query = 'SELECT * FROM _vendata_saved_queries';
@@ -385,6 +417,60 @@ class DatabaseEngine {
 
   void clearRecentFiles() {
     _db.execute('DELETE FROM _vendata_recent_files;');
+  }
+
+  List<DbConnection> getConnections() {
+    try {
+      final res = _db.select('SELECT * FROM _vendata_connections ORDER BY created_at ASC;');
+      return res.map((r) => DbConnection.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  void saveConnection(DbConnection connection) {
+    final map = connection.toMap();
+    _db.execute(
+      '''
+      INSERT INTO _vendata_connections (id, name, type, host, port, database_name, username, password, use_ssl, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        type = excluded.type,
+        host = excluded.host,
+        port = excluded.port,
+        database_name = excluded.database_name,
+        username = excluded.username,
+        password = excluded.password,
+        use_ssl = excluded.use_ssl;
+      ''',
+      [
+        map['id'],
+        map['name'],
+        map['type'],
+        map['host'],
+        map['port'],
+        map['database_name'],
+        map['username'],
+        map['password'],
+        map['use_ssl'],
+        map['created_at'],
+      ],
+    );
+  }
+
+  void deleteConnection(String id) {
+    _db.execute('DELETE FROM _vendata_connections WHERE id = ?;', [id]);
+  }
+
+  DbConnection? getConnection(String id) {
+    try {
+      final res = _db.select('SELECT * FROM _vendata_connections WHERE id = ? LIMIT 1;', [id]);
+      if (res.isEmpty) return null;
+      return DbConnection.fromMap(res.first);
+    } catch (_) {
+      return null;
+    }
   }
 
   List<TableSchema> getTables() {
