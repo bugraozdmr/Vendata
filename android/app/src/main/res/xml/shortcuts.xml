@@ -1,0 +1,37 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="action_new_query"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_query"
+        android:shortcutShortLabel="@string/shortcut_new_query"
+        android:shortcutLongLabel="@string/shortcut_new_query">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.vendata.vendata"
+            android:targetClass="com.vendata.vendata.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="action_upload_file"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_file"
+        android:shortcutShortLabel="@string/shortcut_upload_file"
+        android:shortcutLongLabel="@string/shortcut_upload_file">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.vendata.vendata"
+            android:targetClass="com.vendata.vendata.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="action_connections"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_server"
+        android:shortcutShortLabel="@string/shortcut_connections"
+        android:shortcutLongLabel="@string/shortcut_connections">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.vendata.vendata"
+            android:targetClass="com.vendata.vendata.MainActivity" />
+    </shortcut>
+</shortcuts>
+

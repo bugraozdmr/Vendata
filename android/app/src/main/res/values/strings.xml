@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_new_query">Yeni Sorgu</string>
+    <string name="shortcut_upload_file">Dosya Yükle</string>
+    <string name="shortcut_connections">Sunucu Bağlantıları</string>
+</resources>
+

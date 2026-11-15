@@ -47,6 +47,7 @@ dependencies:
   google_fonts: ^8.2.1
   postgres: ^3.6.0
   mysql_client: ^0.0.27
+  quick_actions: ^1.1.1
 
 dev_dependencies:
   flutter_test:

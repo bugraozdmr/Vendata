@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:quick_actions/quick_actions.dart';
 import '../../core/theme/app_colors.dart';
 import '../providers/database_provider.dart';
 import '../providers/theme_provider.dart';
@@ -18,6 +19,47 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
   String? _selectedTableForQuery;
+  final QuickActions _quickActions = const QuickActions();
+
+  @override
+  void initState() {
+    super.initState();
+    _initQuickActions();
+  }
+
+  void _initQuickActions() {
+    _quickActions.initialize((String shortcutType) {
+      if (!mounted) return;
+      if (shortcutType == 'action_new_query') {
+        setState(() {
+          _selectedTableForQuery = null;
+          _currentIndex = 1;
+        });
+      } else if (shortcutType == 'action_upload_file') {
+        setState(() => _currentIndex = 0);
+      } else if (shortcutType == 'action_connections') {
+        setState(() => _currentIndex = 2);
+      }
+    });
+
+    _quickActions.setShortcutItems(<ShortcutItem>[
+      const ShortcutItem(
+        type: 'action_new_query',
+        localizedTitle: 'Yeni Sorgu',
+        icon: 'ic_shortcut_query',
+      ),
+      const ShortcutItem(
+        type: 'action_upload_file',
+        localizedTitle: 'Dosya Yükle',
+        icon: 'ic_shortcut_file',
+      ),
+      const ShortcutItem(
+        type: 'action_connections',
+        localizedTitle: 'Sunucu Bağlantıları',
+        icon: 'ic_shortcut_server',
+      ),
+    ]);
+  }
 
   void _navigateToQuery(String tableName) {
     setState(() {
@@ -63,8 +105,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
+    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(
@@ -73,12 +118,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: pages,
             ),
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildFloatingBottomNav(context),
-          ),
+          if (!keyboardVisible)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 8,
+              child: _buildFloatingBottomNav(context),
+            ),
         ],
       ),
     );
@@ -184,7 +230,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       left: false,
       right: false,
       bottom: true,
-      minimum: const EdgeInsets.only(bottom: 6),
+      minimum: const EdgeInsets.only(bottom: 12),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 48),
         height: 58,
