@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/export_helper.dart';
+import '../../domain/models/chart_config.dart';
+import '../../domain/models/query_result.dart';
 import '../providers/database_provider.dart';
 import '../widgets/data_grid_table.dart';
 import '../widgets/data_profiler_widget.dart';
@@ -10,6 +12,36 @@ import '../widgets/interactive_chart.dart';
 import '../widgets/query_shortcuts.dart';
 import '../widgets/saved_queries_sheet.dart';
 import '../widgets/visual_query_builder.dart';
+
+class QueryTabModel {
+  final String id;
+  String title;
+  final TextEditingController sqlController;
+  String? activeTable;
+  int queryMode; // 0: Sihirbaz, 1: Analiz, 2: SQL Konsol
+  int activeTab; // 0: Sorgu, 1: Sonuç
+  int resultType; // 0: Tablo, 1: Grafik
+  QueryResult? result;
+  ChartConfig? chartConfig;
+  bool isExecuting;
+
+  QueryTabModel({
+    required this.id,
+    required this.title,
+    required this.sqlController,
+    this.activeTable,
+    this.queryMode = 0,
+    this.activeTab = 0,
+    this.resultType = 0,
+    this.result,
+    this.chartConfig,
+    this.isExecuting = false,
+  });
+
+  void dispose() {
+    sqlController.dispose();
+  }
+}
 
 class SqlScreen extends ConsumerStatefulWidget {
   final String? targetTable;
@@ -21,151 +53,250 @@ class SqlScreen extends ConsumerStatefulWidget {
 }
 
 class _SqlScreenState extends ConsumerState<SqlScreen> {
-  late final TextEditingController _sqlController;
-  int _activeTab = 0;
-  int _queryMode = 0;
-  int _resultType = 0;
-  String? _activeTable;
+  final List<QueryTabModel> _tabs = [];
+  int _selectedTabIndex = 0;
+  int _tabCounter = 1;
   bool _isExporting = false;
+
+  QueryTabModel get _currentTab => _tabs[_selectedTabIndex];
 
   @override
   void initState() {
     super.initState();
-    _activeTable = widget.targetTable;
-    final initialSql = (_activeTable != null && _activeTable!.isNotEmpty)
-        ? 'SELECT * FROM "$_activeTable" LIMIT 50;'
+    final initialTable = widget.targetTable;
+    final initialSql = (initialTable != null && initialTable.isNotEmpty)
+        ? 'SELECT * FROM "$initialTable" LIMIT 50;'
         : '';
+    final initialTitle = (initialTable != null && initialTable.isNotEmpty)
+        ? initialTable
+        : 'Sorgu 1';
 
-    _sqlController = TextEditingController(text: initialSql);
-    // Otomatik sorgu çalıştırma yapılmaz; kullanıcı manuel çalıştırır
+    _tabs.add(QueryTabModel(
+      id: 'tab_init_${DateTime.now().millisecondsSinceEpoch}',
+      title: initialTitle,
+      sqlController: TextEditingController(text: initialSql),
+      activeTable: initialTable,
+      queryMode: (initialTable != null && initialTable.isNotEmpty) ? 0 : 2,
+      activeTab: 0,
+    ));
+    _selectedTabIndex = 0;
+    _tabCounter = 2;
   }
 
   @override
   void didUpdateWidget(covariant SqlScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.targetTable != oldWidget.targetTable) {
-      setState(() {
-        _activeTable = widget.targetTable;
-        if (widget.targetTable != null) {
-          _sqlController.text = 'SELECT * FROM "${widget.targetTable}" LIMIT 50;';
-        }
-      });
+    if (widget.targetTable != oldWidget.targetTable && widget.targetTable != null) {
+      final existingIdx = _tabs.indexWhere((t) => t.activeTable == widget.targetTable);
+      if (existingIdx != -1) {
+        setState(() {
+          _selectedTabIndex = existingIdx;
+        });
+      } else {
+        _addNewTab(tableName: widget.targetTable);
+      }
     }
   }
 
   @override
   void dispose() {
-    _sqlController.dispose();
+    for (final tab in _tabs) {
+      tab.dispose();
+    }
     super.dispose();
   }
 
+  void _addNewTab({String? tableName, String? initialSql}) {
+    final count = _tabCounter++;
+    final sql = (tableName != null && tableName.isNotEmpty)
+        ? 'SELECT * FROM "$tableName" LIMIT 50;'
+        : (initialSql ?? '');
+    final title = (tableName != null && tableName.isNotEmpty)
+        ? tableName
+        : 'Sorgu $count';
+
+    final newTab = QueryTabModel(
+      id: 'tab_${DateTime.now().microsecondsSinceEpoch}',
+      title: title,
+      sqlController: TextEditingController(text: sql),
+      activeTable: tableName,
+      queryMode: (initialSql != null && initialSql.isNotEmpty) ? 2 : (tableName != null ? 0 : 2),
+      activeTab: 0,
+    );
+
+    setState(() {
+      _tabs.add(newTab);
+      _selectedTabIndex = _tabs.length - 1;
+    });
+  }
+
+  void _closeTab(int index) {
+    if (_tabs.length <= 1) {
+      final onlyTab = _tabs[0];
+      setState(() {
+        onlyTab.title = 'Sorgu 1';
+        onlyTab.sqlController.text = '';
+        onlyTab.activeTable = null;
+        onlyTab.queryMode = 0;
+        onlyTab.activeTab = 0;
+        onlyTab.result = null;
+        onlyTab.chartConfig = null;
+        onlyTab.isExecuting = false;
+      });
+      return;
+    }
+
+    setState(() {
+      final removed = _tabs.removeAt(index);
+      removed.dispose();
+      if (_selectedTabIndex >= _tabs.length) {
+        _selectedTabIndex = _tabs.length - 1;
+      }
+    });
+  }
+
   void _handleShortcutInsert(String snippet, bool replace) {
+    final controller = _currentTab.sqlController;
     if (replace) {
-      _sqlController.text = snippet;
-      _sqlController.selection = TextSelection.fromPosition(TextPosition(offset: snippet.length));
+      controller.text = snippet;
+      controller.selection = TextSelection.fromPosition(TextPosition(offset: snippet.length));
     } else {
-      final current = _sqlController.text;
-      final selection = _sqlController.selection;
+      final current = controller.text;
+      final selection = controller.selection;
       final start = selection.start >= 0 ? selection.start : current.length;
       final end = selection.end >= 0 ? selection.end : current.length;
 
       final newText = current.replaceRange(start, end, snippet);
-      _sqlController.value = TextEditingValue(
+      controller.value = TextEditingValue(
         text: newText,
         selection: TextSelection.collapsed(offset: start + snippet.length),
       );
     }
   }
 
-  Future<void> _runQuery([String? customSql, bool switchTab = true, String? tableName]) async {
-    final sql = (customSql ?? _sqlController.text).trim();
-    if (sql.isEmpty) return;
-    _sqlController.text = sql;
-
-    if (switchTab) {
-      setState(() => _activeTab = 1);
+  ChartConfig? _autoDetectChartConfig(QueryResult result) {
+    if (result.columns.isEmpty || result.rows.isEmpty) {
+      return null;
     }
 
-    final target = tableName ?? _activeTable;
-    await ref.read(queryProvider.notifier).runQuery(sql, target);
+    String? candidateLabel;
+    String? candidateValue;
+
+    for (var colIdx = 0; colIdx < result.columns.length; colIdx++) {
+      final colName = result.columns[colIdx];
+      final firstVal = result.rows.first[colIdx];
+
+      if (firstVal is num && candidateValue == null) {
+        candidateValue = colName;
+      } else if (firstVal is String && candidateLabel == null) {
+        candidateLabel = colName;
+      }
+    }
+
+    candidateLabel ??= result.columns.first;
+    candidateValue ??= result.columns.length > 1 ? result.columns[1] : result.columns.first;
+
+    return ChartConfig(
+      type: ChartType.bar,
+      labelColumn: candidateLabel,
+      valueColumn: candidateValue,
+    );
+  }
+
+  Future<void> _runCurrentTabQuery([String? customSql, bool switchTab = true, String? tableName]) async {
+    final tab = _currentTab;
+    final sql = (customSql ?? tab.sqlController.text).trim();
+    if (sql.isEmpty) return;
+    tab.sqlController.text = sql;
+
+    setState(() {
+      tab.isExecuting = true;
+      if (switchTab) {
+        tab.activeTab = 1;
+      }
+    });
+
+    // Micro-delay to yield to Flutter scheduler for smooth spinner rendering
+    await Future.delayed(const Duration(milliseconds: 250));
+
+    final target = tableName ?? tab.activeTable;
+    final engine = ref.read(databaseEngineProvider);
+    final queryResult = engine.executeQuery(sql, tableName: target);
+
+    ChartConfig? autoChart;
+    if (!queryResult.hasError && queryResult.rows.isNotEmpty) {
+      autoChart = _autoDetectChartConfig(queryResult);
+    }
+
+    // Refresh history & saved queries in sqlite
+    ref.read(queryProvider.notifier).refreshSavedQueries(tableName: target);
+
+    if (mounted) {
+      setState(() {
+        tab.isExecuting = false;
+        tab.result = queryResult;
+        if (autoChart != null) {
+          tab.chartConfig = autoChart;
+        }
+        if (target != null && tab.title.startsWith('Sorgu ')) {
+          tab.title = target;
+        }
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final queryState = ref.watch(queryProvider);
     final tablesState = ref.watch(tablesProvider);
-    final chartConfig = ref.watch(chartConfigProvider);
-    final hasResults = !queryState.result.hasError && queryState.result.rows.isNotEmpty;
+    final currentTab = _currentTab;
+    final hasResults = currentTab.result != null && !currentTab.result!.hasError && currentTab.result!.rows.isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Top Header: Clean typography without logo
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF15161A),
-                          borderRadius: BorderRadius.circular(11),
-                          border: Border.all(color: AppColors.border, width: 1),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(12),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.asset(
-                            'assets/logo.png',
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'SQL',
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -1.0,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'SQL',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -1.0,
+                    ),
                   ),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
                       SavedQueriesSheet.show(
                         context: context,
-                        activeTable: _activeTable,
+                        activeTable: currentTab.activeTable,
                         onSelectQuery: (sql, tableName) {
                           Navigator.pop(context);
                           if (tableName != null && tableName.isNotEmpty) {
-                            setState(() => _activeTable = tableName);
+                            setState(() {
+                              currentTab.activeTable = tableName;
+                              currentTab.title = tableName;
+                            });
                           }
-                          _runQuery(sql, true, tableName);
+                          _runCurrentTabQuery(sql, true, tableName);
                         },
                         onLoadIntoEditor: (sql, tableName) {
                           Navigator.pop(context);
-                          if (tableName != null && tableName.isNotEmpty) {
-                            setState(() => _activeTable = tableName);
-                          }
                           setState(() {
-                            _sqlController.text = sql;
-                            _activeTab = 0;
-                            _queryMode = 2; // SQL Konsolu
+                            if (tableName != null && tableName.isNotEmpty) {
+                              currentTab.activeTable = tableName;
+                              currentTab.title = tableName;
+                            }
+                            currentTab.sqlController.text = sql;
+                            currentTab.activeTab = 0;
+                            currentTab.queryMode = 2; // SQL Konsolu
                           });
                         },
                       );
@@ -200,11 +331,19 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               ),
             ),
             const SizedBox(height: 10),
+
+            // Multi-Tab Bar: Tactile Blockit style tabs
+            _buildTabBar(),
+            const SizedBox(height: 8),
+
+            // Active Table Selector Bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _buildTableSelectorBar(tablesState),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+
+            // Sub-Tabs: Sorgu vs Sonuç
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
@@ -217,7 +356,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                   children: [
                     _buildTabButton('Sorgu', 0, Icons.edit_note_rounded),
                     _buildTabButton(
-                      hasResults ? 'Sonuç (${queryState.result.rowCount})' : 'Sonuç',
+                      hasResults ? 'Sonuç (${currentTab.result!.rowCount})' : 'Sonuç',
                       1,
                       Icons.table_rows_rounded,
                     ),
@@ -226,12 +365,159 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               ),
             ),
             const SizedBox(height: 8),
+
+            // Content Area: Either Query Input or Results
             Expanded(
-              child: _activeTab == 0
-                  ? _buildQueryInputSection(tablesState, queryState)
-                  : _buildFullResultsView(queryState.result, chartConfig, queryState.isExecuting),
+              child: currentTab.activeTab == 0
+                  ? _buildQueryInputSection(tablesState)
+                  : _buildFullResultsView(currentTab.result, currentTab.chartConfig, currentTab.isExecuting),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      height: 38,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: _tabs.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final tab = _tabs[index];
+                final isSelected = index == _selectedTabIndex;
+                return _buildTabPill(tab, index, isSelected);
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          _buildNewTabButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabPill(QueryTabModel tab, int index, bool isSelected) {
+    final hasError = tab.result != null && tab.result!.hasError;
+    final hasRows = tab.result != null && !tab.result!.hasError && tab.result!.rows.isNotEmpty;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (_selectedTabIndex != index) {
+          setState(() {
+            _selectedTabIndex = index;
+          });
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected ? Colors.black.withAlpha(20) : Colors.black.withAlpha(4),
+              blurRadius: isSelected ? 8 : 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasError)
+              Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: const BoxDecoration(
+                  color: AppColors.error,
+                  shape: BoxShape.circle,
+                ),
+              )
+            else if (hasRows)
+              Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: const BoxDecoration(
+                  color: AppColors.accent,
+                  shape: BoxShape.circle,
+                ),
+              )
+            else
+              Icon(
+                Icons.terminal_rounded,
+                size: 13,
+                color: isSelected ? AppColors.accent : AppColors.textMuted,
+              ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 110),
+              child: Text(
+                tab.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _closeTab(index),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 13,
+                  color: isSelected ? Colors.white70 : AppColors.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewTabButton() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _addNewTab(),
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(5),
+              blurRadius: 5,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Icon(Icons.add_rounded, size: 20, color: AppColors.textPrimary),
         ),
       ),
     );
@@ -242,9 +528,11 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
       return const SizedBox.shrink();
     }
 
-    if (_activeTable == null) {
+    final currentTab = _currentTab;
+
+    if (currentTab.activeTable == null) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -279,8 +567,11 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
                         setState(() {
-                          _activeTable = t.name;
-                          _sqlController.text = 'SELECT * FROM "${t.name}" LIMIT 50;';
+                          currentTab.activeTable = t.name;
+                          currentTab.sqlController.text = 'SELECT * FROM "${t.name}" LIMIT 50;';
+                          if (currentTab.title.startsWith('Sorgu ')) {
+                            currentTab.title = t.name;
+                          }
                         });
                         ref.read(queryProvider.notifier).setActiveTable(t.name);
                       },
@@ -307,7 +598,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
       );
     }
 
-    final tableInfo = tablesState.tables.where((t) => t.name == _activeTable).firstOrNull;
+    final tableInfo = tablesState.tables.where((t) => t.name == currentTab.activeTable).firstOrNull;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -335,7 +626,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               children: [
                 Flexible(
                   child: Text(
-                    _activeTable!,
+                    currentTab.activeTable!,
                     style: GoogleFonts.spaceGrotesk(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -357,14 +648,16 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
             onSelected: (val) {
               if (val == '__clear__') {
                 setState(() {
-                  _activeTable = null;
-                  _sqlController.text = '';
+                  currentTab.activeTable = null;
+                  currentTab.sqlController.text = '';
+                  currentTab.title = 'Sorgu ${_selectedTabIndex + 1}';
                 });
                 ref.read(queryProvider.notifier).setActiveTable(null);
               } else {
                 setState(() {
-                  _activeTable = val;
-                  _sqlController.text = 'SELECT * FROM "$val" LIMIT 50;';
+                  currentTab.activeTable = val;
+                  currentTab.sqlController.text = 'SELECT * FROM "$val" LIMIT 50;';
+                  currentTab.title = val;
                 });
                 ref.read(queryProvider.notifier).setActiveTable(val);
               }
@@ -405,11 +698,11 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
   }
 
   Widget _buildTabButton(String label, int index, IconData icon) {
-    final isSelected = _activeTab == index;
+    final isSelected = _currentTab.activeTab == index;
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _activeTab = index),
+        onTap: () => setState(() => _currentTab.activeTab = index),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -440,13 +733,15 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     );
   }
 
-  Widget _buildQueryInputSection(TablesState tablesState, QueryState queryState) {
+  Widget _buildQueryInputSection(TablesState tablesState) {
     final profilerService = ref.watch(dataProfilerServiceProvider);
+    final queryState = ref.watch(queryProvider);
+    final currentTab = _currentTab;
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -461,41 +756,53 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
             ),
           ),
         ),
-        if (queryState.result.hasError) _buildErrorBanner(queryState.result.error!),
+        if (currentTab.result?.hasError == true) _buildErrorBanner(currentTab.result!.error!),
         Expanded(
-          child: _queryMode == 0
+          child: currentTab.queryMode == 0
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                   child: VisualQueryBuilder(
+                    key: ValueKey('vqb_${currentTab.id}'),
                     tables: tablesState.tables,
-                    initialTable: _activeTable,
-                    isExecuting: queryState.isExecuting,
-                    onExecute: (sql) => _runQuery(sql, true, _activeTable),
-                    onTableChanged: (tableName) => setState(() => _activeTable = tableName),
+                    initialTable: currentTab.activeTable,
+                    isExecuting: currentTab.isExecuting,
+                    onExecute: (sql) => _runCurrentTabQuery(sql, true, currentTab.activeTable),
+                    onTableChanged: (tableName) => setState(() {
+                      currentTab.activeTable = tableName;
+                      if (currentTab.title.startsWith('Sorgu ')) {
+                        currentTab.title = tableName;
+                      }
+                    }),
                   ),
                 )
-              : (_queryMode == 1
+              : (currentTab.queryMode == 1
                   ? Padding(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                       child: DataProfilerWidget(
+                        key: ValueKey('dpw_${currentTab.id}'),
                         tables: tablesState.tables,
-                        initialTable: _activeTable,
+                        initialTable: currentTab.activeTable,
                         profilerService: profilerService,
-                        onExecute: (sql) => _runQuery(sql, true, _activeTable),
-                        onTableChanged: (tableName) => setState(() => _activeTable = tableName),
+                        onExecute: (sql) => _runCurrentTabQuery(sql, true, currentTab.activeTable),
+                        onTableChanged: (tableName) => setState(() {
+                          currentTab.activeTable = tableName;
+                          if (currentTab.title.startsWith('Sorgu ')) {
+                            currentTab.title = tableName;
+                          }
+                        }),
                       ),
                     )
-                  : _buildManualEditor(tablesState, queryState)),
+                  : _buildManualEditor(tablesState, currentTab, queryState)),
         ),
       ],
     );
   }
 
   Widget _buildModePill(String title, int mode, IconData icon) {
-    final isSelected = _queryMode == mode;
+    final isSelected = _currentTab.queryMode == mode;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _queryMode = mode),
+      onTap: () => setState(() => _currentTab.queryMode = mode),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -525,7 +832,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     );
   }
 
-  Widget _buildManualEditor(TablesState tablesState, QueryState queryState) {
+  Widget _buildManualEditor(TablesState tablesState, QueryTabModel tab, QueryState queryState) {
     final availableTableNames = tablesState.tables.map((t) => t.name).toList();
 
     return Padding(
@@ -549,7 +856,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: TextField(
-                  controller: _sqlController,
+                  controller: tab.sqlController,
                   maxLines: null,
                   expands: true,
                   keyboardType: TextInputType.multiline,
@@ -571,7 +878,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           const SizedBox(height: 14),
           Builder(
             builder: (context) {
-              final currentSql = _sqlController.text.trim();
+              final currentSql = tab.sqlController.text.trim();
               final isFavorite = queryState.savedQueries.any((q) => q.queryText.trim() == currentSql && q.isFavorite);
 
               return Row(
@@ -620,17 +927,17 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                     child: SizedBox(
                       height: 52,
                       child: GestureDetector(
-                        onTap: queryState.isExecuting ? null : () => _runQuery(),
+                        onTap: tab.isExecuting ? null : () => _runCurrentTabQuery(),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: queryState.isExecuting ? AppColors.textMuted : AppColors.accent,
+                            color: tab.isExecuting ? AppColors.textMuted : AppColors.accent,
                             borderRadius: BorderRadius.circular(18),
-                            boxShadow: queryState.isExecuting
+                            boxShadow: tab.isExecuting
                                 ? null
                                 : [BoxShadow(color: AppColors.accent.withAlpha(40), blurRadius: 12, offset: const Offset(0, 4))],
                           ),
                           child: Center(
-                            child: queryState.isExecuting
+                            child: tab.isExecuting
                                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                 : Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -657,7 +964,9 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     );
   }
 
-  Widget _buildFullResultsView(dynamic result, dynamic chartConfig, bool isExecuting) {
+  Widget _buildFullResultsView(QueryResult? result, ChartConfig? chartConfig, bool isExecuting) {
+    final currentTab = _currentTab;
+
     if (isExecuting) {
       return Center(
         child: Column(
@@ -686,6 +995,44 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
             ),
           ],
+        ),
+      );
+    }
+
+    if (result == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.terminal_rounded, size: 52, color: AppColors.textMuted.withAlpha(100)),
+              const SizedBox(height: 16),
+              Text(
+                'Henüz Sorgu Çalıştırılmadı',
+                style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Bu sekmede henüz bir sorgu yürütülmedi. "Sorgu" sekmesine geçerek sorgunuzu oluşturup çalıştırın.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.dmSans(fontSize: 14, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => currentTab.activeTab = 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text('Sorgu Yaz', style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -728,7 +1075,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 const SizedBox(height: 20),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _activeTab = 0),
+                  onTap: () => setState(() => currentTab.activeTab = 0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(
@@ -760,21 +1107,21 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Sorgu çalıştırarak sonuçları görüntüleyin.',
+                'Sorgu başarıyla çalıştırıldı ancak dönen satır bulunamadı.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.dmSans(fontSize: 14, color: AppColors.textMuted),
               ),
               const SizedBox(height: 20),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => setState(() => _activeTab = 0),
+                onTap: () => setState(() => currentTab.activeTab = 0),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Text('Sorgu Yaz', style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                  child: Text('Sorguyu Değiştir', style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
                 ),
               ),
             ],
@@ -801,9 +1148,9 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 ),
               ),
               const Spacer(),
-              _buildMiniToggle('Tablo', Icons.table_rows_rounded, _resultType == 0, () => setState(() => _resultType = 0)),
+              _buildMiniToggle('Tablo', Icons.table_rows_rounded, currentTab.resultType == 0, () => setState(() => currentTab.resultType = 0)),
               const SizedBox(width: 6),
-              _buildMiniToggle('Grafik', Icons.bar_chart_rounded, _resultType == 1, () => setState(() => _resultType = 1)),
+              _buildMiniToggle('Grafik', Icons.bar_chart_rounded, currentTab.resultType == 1, () => setState(() => currentTab.resultType = 1)),
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: _isExporting
@@ -841,9 +1188,9 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 80),
-            child: _resultType == 0
+            child: currentTab.resultType == 0
                 ? DataGridTable(result: result)
-                : (chartConfig == null
+                : (currentTab.chartConfig == null
                     ? Center(
                         child: Text(
                           'Grafik için sayısal sütun gerekli.',
@@ -852,9 +1199,11 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                       )
                     : InteractiveChart(
                         result: result,
-                        config: chartConfig,
+                        config: currentTab.chartConfig!,
                         onConfigChanged: (newConfig) {
-                          ref.read(chartConfigProvider.notifier).updateConfig(newConfig);
+                          setState(() {
+                            currentTab.chartConfig = newConfig;
+                          });
                         },
                       )),
           ),
