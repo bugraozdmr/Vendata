@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'package:sqlite3/sqlite3.dart';
+import '../../core/config/app_config.dart';
+import '../../core/constants/ai_providers_constants.dart';
 import '../../core/utils/sql_sanitizer.dart';
+import '../../domain/models/ai_chat_model.dart';
+import '../../domain/models/ai_provider.dart';
 import '../../domain/models/db_connection.dart';
 import '../../domain/models/query_result.dart';
 import '../../domain/models/recent_file.dart';
@@ -81,8 +85,52 @@ class DatabaseEngine {
       );
     ''');
 
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS _vendata_ai_providers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        provider_type TEXT NOT NULL,
+        model_name TEXT NOT NULL,
+        api_key TEXT NOT NULL,
+        base_url TEXT,
+        is_active INTEGER DEFAULT 0,
+        is_predefined INTEGER DEFAULT 0,
+        custom_models TEXT DEFAULT ''
+      );
+    ''');
+
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS _vendata_ai_conversations (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        table_name TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    ''');
+
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS _vendata_ai_messages (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        sql_query TEXT,
+        result_json TEXT,
+        chart_type TEXT,
+        chart_x TEXT,
+        chart_y TEXT,
+        intent TEXT,
+        execution_time_ms INTEGER DEFAULT 0,
+        row_count INTEGER DEFAULT 0,
+        error_message TEXT,
+        created_at TEXT NOT NULL
+      );
+    ''');
+
     _migrateSavedQueriesTable();
     _seedInitialConnections();
+    _seedInitialAiProviders();
   }
 
   void _seedInitialConnections() {
@@ -715,6 +763,223 @@ class DatabaseEngine {
       }
     }
     return types;
+  }
+
+  // --- AI Providers & Settings ---
+
+  void _seedInitialAiProviders() {
+    try {
+      final existing = _db.select('SELECT id FROM _vendata_ai_providers LIMIT 1;');
+      if (existing.isNotEmpty) return;
+
+      final geminiKey = AppConfig.geminiApiKey;
+      final openRouterKey = AppConfig.openRouterApiKey;
+      final hasGeminiKey = geminiKey.trim().isNotEmpty;
+      final hasOpenRouterKey = openRouterKey.trim().isNotEmpty;
+
+      for (final preset in AIProvidersConstants.presets) {
+        String key = '';
+        bool isActive = false;
+        if (preset.id == AIProvidersConstants.geminiId) {
+          key = geminiKey;
+          isActive = hasGeminiKey || !hasOpenRouterKey;
+        } else if (preset.id == AIProvidersConstants.openrouterId) {
+          key = openRouterKey;
+          isActive = !hasGeminiKey && hasOpenRouterKey;
+        }
+
+        saveAiProvider(AIProviderModel(
+          id: preset.id,
+          name: preset.name,
+          providerType: preset.providerType,
+          modelName: preset.defaultModel,
+          apiKey: key,
+          baseUrl: preset.defaultBaseUrl,
+          isActive: isActive,
+          isPredefined: true,
+          customModels: const [],
+        ));
+      }
+    } catch (_) {}
+  }
+
+  List<AIProviderModel> getAiProviders() {
+    try {
+      final res = _db.select('SELECT * FROM _vendata_ai_providers ORDER BY is_predefined DESC, name ASC;');
+      return res.map((r) => AIProviderModel.fromMap(Map<String, dynamic>.from(r))).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  AIProviderModel? getActiveAiProvider() {
+    try {
+      final res = _db.select('SELECT * FROM _vendata_ai_providers WHERE is_active = 1 LIMIT 1;');
+      if (res.isNotEmpty) {
+        return AIProviderModel.fromMap(Map<String, dynamic>.from(res.first));
+      }
+      final all = getAiProviders();
+      if (all.isEmpty) return null;
+      return all.firstWhere((p) => p.apiKey.isNotEmpty, orElse: () => all.first);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void saveAiProvider(AIProviderModel provider) {
+    try {
+      _db.execute(
+        '''
+        INSERT INTO _vendata_ai_providers (id, name, provider_type, model_name, api_key, base_url, is_active, is_predefined, custom_models)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          provider_type = excluded.provider_type,
+          model_name = excluded.model_name,
+          api_key = excluded.api_key,
+          base_url = excluded.base_url,
+          is_active = excluded.is_active,
+          is_predefined = excluded.is_predefined,
+          custom_models = excluded.custom_models;
+        ''',
+        [
+          provider.id,
+          provider.name,
+          provider.providerType,
+          provider.modelName,
+          provider.apiKey,
+          provider.baseUrl,
+          provider.isActive ? 1 : 0,
+          provider.isPredefined ? 1 : 0,
+          provider.customModels.join(','),
+        ],
+      );
+    } catch (_) {}
+  }
+
+  void setActiveAiProvider(String id) {
+    try {
+      _db.execute('UPDATE _vendata_ai_providers SET is_active = 0;');
+      _db.execute('UPDATE _vendata_ai_providers SET is_active = 1 WHERE id = ?;', [id]);
+    } catch (_) {}
+  }
+
+  void deleteAiProvider(String id) {
+    try {
+      _db.execute('DELETE FROM _vendata_ai_providers WHERE id = ? AND is_predefined = 0;', [id]);
+    } catch (_) {}
+  }
+
+  // --- AI Conversations & Messages ---
+
+  List<AiConversation> getAiConversations() {
+    try {
+      final res = _db.select('''
+        SELECT c.*, COUNT(m.id) as message_count
+        FROM _vendata_ai_conversations c
+        LEFT JOIN _vendata_ai_messages m ON c.id = m.conversation_id
+        GROUP BY c.id
+        ORDER BY c.updated_at DESC;
+      ''');
+      return res.map((r) {
+        final map = Map<String, dynamic>.from(r);
+        final count = (map['message_count'] as int?) ?? 0;
+        return AiConversation.fromMap(map, messageCount: count);
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  void saveAiConversation(AiConversation conv) {
+    try {
+      _db.execute(
+        '''
+        INSERT INTO _vendata_ai_conversations (id, title, table_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          title = excluded.title,
+          table_name = excluded.table_name,
+          updated_at = excluded.updated_at;
+        ''',
+        [
+          conv.id,
+          conv.title,
+          conv.tableName,
+          conv.createdAt.toIso8601String(),
+          conv.updatedAt.toIso8601String(),
+        ],
+      );
+    } catch (_) {}
+  }
+
+  void updateAiConversationTitle(String id, String title) {
+    try {
+      _db.execute(
+        'UPDATE _vendata_ai_conversations SET title = ?, updated_at = ? WHERE id = ?;',
+        [title, DateTime.now().toIso8601String(), id],
+      );
+    } catch (_) {}
+  }
+
+  void deleteAiConversation(String id) {
+    try {
+      _db.execute('DELETE FROM _vendata_ai_messages WHERE conversation_id = ?;', [id]);
+      _db.execute('DELETE FROM _vendata_ai_conversations WHERE id = ?;', [id]);
+    } catch (_) {}
+  }
+
+  List<AiMessage> getAiMessages(String conversationId) {
+    try {
+      final res = _db.select(
+        'SELECT * FROM _vendata_ai_messages WHERE conversation_id = ? ORDER BY created_at ASC;',
+        [conversationId],
+      );
+      return res.map((r) => AiMessage.fromMap(Map<String, dynamic>.from(r))).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  void saveAiMessage(AiMessage msg) {
+    try {
+      _db.execute(
+        '''
+        INSERT INTO _vendata_ai_messages (
+          id, conversation_id, role, content, sql_query, result_json,
+          chart_type, chart_x, chart_y, intent, execution_time_ms, row_count, error_message, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ''',
+        [
+          msg.id,
+          msg.conversationId,
+          msg.role,
+          msg.content,
+          msg.sqlQuery,
+          msg.resultJson,
+          msg.chartType,
+          msg.chartX,
+          msg.chartY,
+          msg.intent,
+          msg.executionTimeMs,
+          msg.rowCount,
+          msg.errorMessage,
+          msg.createdAt.toIso8601String(),
+        ],
+      );
+
+      // Update conversation updated_at
+      _db.execute(
+        'UPDATE _vendata_ai_conversations SET updated_at = ? WHERE id = ?;',
+        [DateTime.now().toIso8601String(), msg.conversationId],
+      );
+    } catch (_) {}
+  }
+
+  void deleteAiMessage(String id) {
+    try {
+      _db.execute('DELETE FROM _vendata_ai_messages WHERE id = ?;', [id]);
+    } catch (_) {}
   }
 
   void close() {

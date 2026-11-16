@@ -7,11 +7,14 @@ import 'package:intl/intl.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/file_helper.dart';
+import '../../data/services/db_session.dart';
+import '../../domain/models/query_result.dart';
 import '../../domain/models/recent_file.dart';
 import '../../domain/models/saved_query.dart';
 import '../../domain/models/table_schema.dart';
 import '../providers/connection_provider.dart';
 import '../providers/database_provider.dart';
+import '../widgets/data_grid_table.dart';
 
 class TablesScreen extends ConsumerStatefulWidget {
   final void Function(String tableName) onNavigateToSql;
@@ -23,6 +26,8 @@ class TablesScreen extends ConsumerStatefulWidget {
 }
 
 class _TablesScreenState extends ConsumerState<TablesScreen> {
+  bool _localSelected = false;
+
   Future<void> _pickFile() async {
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
@@ -45,6 +50,18 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     final activeConnection = connectionsState.activeConnection;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
+    ref.listen<String?>(
+      connectionsProvider.select((s) => s.activeConnection?.id),
+      (previous, next) {
+        if (next != null && next != previous && _localSelected && mounted) {
+          setState(() => _localSelected = false);
+        }
+      },
+    );
+
+    final showLocal = !tablesState.isRemote || _localSelected;
+    final displayedTables = showLocal ? tablesState.localTables : tablesState.tables;
+
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -52,49 +69,62 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
           physics: const BouncingScrollPhysics(),
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF15161A),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border, width: 1.2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(15),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF15161A),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.border, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(15),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.cover,
                           ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(11),
-                        child: Image.asset(
-                          'assets/logo.png',
-                          fit: BoxFit.cover,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      AppConfig.appName,
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -1.0,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          AppConfig.appName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.8,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: tablesState.isLoading
                       ? null
-                      : () => ref.read(tablesProvider.notifier).refreshTables(),
+                      : () {
+                          final notifier = ref.read(tablesProvider.notifier);
+                          if (tablesState.isRemote && showLocal) {
+                            notifier.refreshLocalTables();
+                          } else {
+                            notifier.refreshTables();
+                          }
+                        },
                   behavior: HitTestBehavior.opaque,
                   child: Tooltip(
                     message: 'Tabloları yenile',
@@ -110,8 +140,8 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                     ),
                   ),
                 ),
-                if (!tablesState.isRemote) const SizedBox(width: 8),
-                if (!tablesState.isRemote)
+                if (showLocal) const SizedBox(width: 8),
+                if (showLocal)
                   GestureDetector(
                     onTap: tablesState.isLoading ? null : _pickFile,
                     behavior: HitTestBehavior.opaque,
@@ -170,6 +200,23 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                     ? const ConnectionHealth()
                     : connectionsState.healthFor(activeConnection.id),
               ),
+              const SizedBox(height: 12),
+              _buildSourceSwitcher(tablesState, showLocal: showLocal),
+              if (showLocal) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textMuted),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Yerel tablolar, sunucu bağlantısı açıkken salt okunur önizlenir.',
+                        style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
             if (tablesState.isLoading) ...[
               const SizedBox(height: 14),
@@ -226,7 +273,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               const SizedBox(height: 12),
               _buildErrorBanner(tablesState.errorMessage!),
             ],
-            if (tablesState.recentFiles.isNotEmpty) ...[
+            if (showLocal && tablesState.recentFiles.isNotEmpty) ...[
               const SizedBox(height: 22),
               _buildRecentFiles(tablesState.recentFiles),
             ],
@@ -234,7 +281,9 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
             Row(
               children: [
                 Text(
-                  'Tablolar',
+                  tablesState.isRemote
+                      ? (showLocal ? 'Yerel Tablolar' : 'Sunucu Tabloları')
+                      : 'Tablolar',
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -250,7 +299,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${tablesState.tables.length}',
+                    '${displayedTables.length}',
                     style: GoogleFonts.spaceGrotesk(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -261,10 +310,16 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            if (tablesState.tables.isEmpty)
-              _buildEmptyState()
+            if (displayedTables.isEmpty)
+              _buildEmptyState(isRemote: tablesState.isRemote && !showLocal)
             else
-              ...tablesState.tables.map((t) => _buildTableCard(t)),
+              ...displayedTables.map(
+                (t) => _buildTableCard(
+                  t,
+                  localSource: showLocal,
+                  previewOnly: tablesState.isRemote && showLocal,
+                ),
+              ),
           ],
         ),
       ),
@@ -286,6 +341,91 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
             child: Text(error, style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.error)),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSourceSwitcher(TablesState tablesState, {required bool showLocal}) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.cardMuted,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildSourcePill(
+              label: 'Sunucu',
+              count: tablesState.tables.length,
+              icon: Icons.dns_rounded,
+              selected: !showLocal,
+              onTap: () => setState(() => _localSelected = false),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _buildSourcePill(
+              label: 'Yerel',
+              count: tablesState.localTables.length,
+              icon: Icons.folder_rounded,
+              selected: showLocal,
+              onTap: () => setState(() => _localSelected = true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourcePill({
+    required String label,
+    required int count,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 15, color: selected ? Colors.white : AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+              decoration: BoxDecoration(
+                color: selected ? Colors.white.withAlpha(40) : AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : AppColors.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -407,7 +547,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     }
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isRemote = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       decoration: BoxDecoration(
@@ -419,40 +559,48 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
       ),
       child: Column(
         children: [
-          Icon(Icons.folder_open_rounded, size: 48, color: AppColors.textMuted.withAlpha(100)),
+          Icon(
+            isRemote ? Icons.cloud_off_rounded : Icons.folder_open_rounded,
+            size: 48,
+            color: AppColors.textMuted.withAlpha(100),
+          ),
           const SizedBox(height: 14),
           Text(
-            'Henüz Tablo Eklenmedi',
+            isRemote ? 'Sunucuda Tablo Bulunamadı' : 'Henüz Tablo Eklenmedi',
             style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
           Text(
-            'Başlamak için sağ üstteki butondan veya aşağıdan Excel, CSV ya da SQL dosyanızı seçin.',
+            isRemote
+                ? 'Bağlı veritabanında görünür bir tablo yok. Yetkileri ve şemayı kontrol edip yenileyin.'
+                : 'Başlamak için sağ üstteki butondan veya aşağıdan Excel, CSV ya da SQL dosyanızı seçin.',
             textAlign: TextAlign.center,
             style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: _pickFile,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Dosya Seç',
-                    style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                ],
+          if (!isRemote) ...[
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: _pickFile,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Dosya Seç',
+                      style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -540,13 +688,16 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     );
   }
 
-  Widget _buildTableCard(TableSchema table) {
+  Widget _buildTableCard(
+    TableSchema table, {
+    required bool localSource,
+    required bool previewOnly,
+  }) {
     final dateStr = table.lastAccessedAt != null
         ? DateFormat('dd.MM.yyyy').format(table.lastAccessedAt!)
         : (table.createdAt != null ? DateFormat('dd.MM.yyyy').format(table.createdAt!) : '');
 
     final queryState = ref.watch(queryProvider);
-    final isRemote = ref.watch(tablesProvider).isRemote;
     final hasStarredQueries = queryState.savedQueries.any((q) => q.tableName == table.name && q.isFavorite);
 
     return Container(
@@ -564,7 +715,9 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => _showTableDetailsAndQueriesSheet(context, table),
+              onTap: previewOnly
+                  ? () => _showLocalPreview(table)
+                  : () => _showTableDetailsAndQueriesSheet(context, table),
               child: Row(
                 children: [
                   Container(
@@ -615,11 +768,11 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               ),
             ),
           ),
-          if (!isRemote) ...[
+          if (localSource) ...[
             const SizedBox(width: 8),
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => ref.read(tablesProvider.notifier).dropTable(table.name),
+              onTap: () => ref.read(tablesProvider.notifier).dropTable(table.name, local: true),
               child: Padding(
                 padding: const EdgeInsets.all(6),
                 child: Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted.withAlpha(160)),
@@ -630,22 +783,151 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
-              ref.read(tablesProvider.notifier).markTableAccessed(table.name);
+              if (previewOnly) {
+                _showLocalPreview(table);
+                return;
+              }
+              ref.read(tablesProvider.notifier).markTableAccessed(table.name, local: localSource);
               widget.onNavigateToSql(table.name);
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: previewOnly ? AppColors.accent : AppColors.primary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Sorgula',
+                previewOnly ? 'Önizle' : 'Sorgula',
                 style: GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showLocalPreview(TableSchema table) {
+    final engine = ref.read(databaseEngineProvider);
+    final quoted = DbDialect.sqlite.quoteIdentifier(table.name);
+    final QueryResult result;
+    try {
+      result = engine.executeQuery(
+        'SELECT * FROM $quoted LIMIT 100;',
+        tableName: table.name,
+        logQuery: false,
+      );
+    } catch (e) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text(
+            'Önizleme açılamadı',
+            style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
+          content: Text(
+            e.toString(),
+            style: GoogleFonts.firaCode(fontSize: 12, color: AppColors.error),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Kapat',
+                style: GoogleFonts.dmSans(fontWeight: FontWeight.w600, color: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.sizeOf(ctx).height * 0.85,
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 12, 10),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.folder_rounded, size: 18, color: AppColors.accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            table.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Yerel dosya önizlemesi · ilk ${result.rowCount} satır',
+                            style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: AppColors.border),
+              if (result.hasError)
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        result.error ?? 'Önizleme alınamadı.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.firaCode(fontSize: 12, color: AppColors.error),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Expanded(child: DataGridTable(result: result)),
+            ],
+          ),
+        ),
       ),
     );
   }

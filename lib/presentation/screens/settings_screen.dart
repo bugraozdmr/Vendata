@@ -7,7 +7,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/file_helper.dart';
 import '../../domain/models/saved_query.dart';
 import '../providers/database_provider.dart';
+import '../providers/ai_provider.dart';
 import '../providers/theme_provider.dart';
+import 'ai_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   final void Function(String sql) onOpenQuery;
@@ -28,6 +30,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final tablesState = ref.watch(tablesProvider);
     final queryState = ref.watch(queryProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final activeAi = ref.watch(activeAiProvider);
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final dbSizeBytes = engine.getDatabaseSizeBytes();
@@ -50,12 +53,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            _buildAiSection(activeAi),
+            const SizedBox(height: 24),
             _buildStorageSection(dbSizeBytes, totalTables, totalRows),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             _buildThemeSection(themeMode),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             _buildQueryHistory(queryState),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             _buildDangerZone(),
             const SizedBox(height: 32),
             Center(
@@ -75,6 +80,114 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAiSection(dynamic activeAi) {
+    final hasKey = activeAi != null && activeAi.apiKey.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentLight,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.auto_awesome_rounded, size: 20, color: AppColors.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Yapay Zeka (AI) Asistanı',
+                      style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                    Text(
+                      'Doğal dil sorguları, grafikler ve modeller',
+                      style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.cardMuted,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: hasKey ? AppColors.success : AppColors.warning,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        activeAi != null ? '${activeAi.name}' : 'Seçili Model Yok',
+                        style: GoogleFonts.spaceGrotesk(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      ),
+                      Text(
+                        activeAi != null
+                            ? '${activeAi.modelName} · ${hasKey ? "Hazır" : "API Anahtarı Eksik"}'
+                            : 'Yapılandırılmadı',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 11,
+                          color: hasKey ? AppColors.textSecondary : AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AISettingsScreen()),
+                    );
+                  },
+                  child: Text(
+                    'Modeller & API',
+                    style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

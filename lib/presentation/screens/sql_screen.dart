@@ -11,6 +11,8 @@ import '../../domain/models/query_result.dart';
 import '../../domain/models/visual_query.dart';
 import '../providers/connection_provider.dart';
 import '../providers/database_provider.dart';
+import '../providers/ai_provider.dart';
+import 'ai_settings_screen.dart';
 import '../widgets/data_grid_table.dart';
 import '../widgets/data_profiler_widget.dart';
 import '../widgets/interactive_chart.dart';
@@ -316,6 +318,483 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showAiGenerateSheet(TablesState tablesState) {
+    final activeProvider = ref.read(activeAiProvider);
+    final promptController = TextEditingController();
+    String? selectedTable = _currentTab.activeTable;
+    bool isGenerating = false;
+    String? generatedSql;
+    String? errorMessage;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            final hasProvider = activeProvider != null && activeProvider.apiKey.isNotEmpty;
+
+            return Container(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withAlpha(25),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'AI ile SQL Oluştur',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              if (activeProvider != null)
+                                Text(
+                                  'Model: ${activeProvider.modelName}',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 12,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(sheetContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (!hasProvider) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withAlpha(20),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.warning.withAlpha(60)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'AI Sağlayıcı Ayarlanmamış',
+                                  style: GoogleFonts.dmSans(fontWeight: FontWeight.w700, color: AppColors.warning),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Sorgu üretebilmek için ayarlardan Gemini, OpenAI veya OpenRouter API anahtarınızı giriniz.',
+                              style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textSecondary),
+                            ),
+                            const SizedBox(height: 10),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(sheetContext);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const AISettingsScreen()),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.accent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.settings_rounded, size: 16),
+                              label: const Text('AI Ayarlarını Aç'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      if (tablesState.tables.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            Text(
+                              'Hedef Tablo:',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String?>(
+                                    value: selectedTable,
+                                    isExpanded: true,
+                                    items: [
+                                      const DropdownMenuItem(
+                                        value: null,
+                                        child: Text('Tüm Tablolar (Otomatik)'),
+                                      ),
+                                      ...tablesState.tables.map(
+                                        (t) => DropdownMenuItem(
+                                          value: t.name,
+                                          child: Text(t.name),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (val) {
+                                      setSheetState(() => selectedTable = val);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      TextField(
+                        controller: promptController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'Örn: En yüksek cirosu olan ilk 5 müşteriyi ve toplam harcamalarını listele...',
+                          hintStyle: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: AppColors.accent, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (errorMessage != null) ...[
+                        Text(
+                          errorMessage!,
+                          style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.error),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (generatedSql != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.accent.withAlpha(60)),
+                          ),
+                          child: SelectableText(
+                            generatedSql!,
+                            style: GoogleFonts.jetBrainsMono(fontSize: 13, color: AppColors.textPrimary),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  _copyToClipboard(generatedSql!, 'SQL panoya kopyalandı');
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                icon: const Icon(Icons.copy_rounded, size: 16),
+                                label: const Text('Kopyala'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  final tab = _currentTab;
+                                  tab.sqlController.text = generatedSql!;
+                                  setState(() {
+                                    tab.queryMode = 2;
+                                  });
+                                  Navigator.pop(sheetContext);
+                                  _runCurrentTabQuery(generatedSql, true, selectedTable ?? tab.activeTable);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                                label: const Text('Uygula & Çalıştır'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      ElevatedButton(
+                        onPressed: isGenerating
+                            ? null
+                            : () async {
+                                final text = promptController.text.trim();
+                                if (text.isEmpty) return;
+                                setSheetState(() {
+                                  isGenerating = true;
+                                  errorMessage = null;
+                                  generatedSql = null;
+                                });
+                                try {
+                                  final session = ref.read(sessionProvider);
+                                  final aiService = ref.read(aiServiceProvider);
+                                  final sql = await aiService.generateSqlFromPrompt(
+                                    prompt: text,
+                                    tables: tablesState.tables,
+                                    activeTableName: selectedTable,
+                                    dialect: session.dialect,
+                                    provider: activeProvider,
+                                  );
+                                  setSheetState(() {
+                                    generatedSql = sql;
+                                    isGenerating = false;
+                                  });
+                                } catch (e) {
+                                  setSheetState(() {
+                                    errorMessage = 'Hata: $e';
+                                    isGenerating = false;
+                                  });
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: isGenerating
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.auto_awesome_rounded, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Sorgu Üret',
+                                    style: GoogleFonts.dmSans(fontSize: 15, fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAiExplainSheet(QueryTabModel tab, TablesState tablesState) {
+    final sql = tab.sqlController.text.trim();
+    if (sql.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Açıklanacak bir SQL sorgusu bulunmuyor', style: GoogleFonts.dmSans()),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final activeProvider = ref.read(activeAiProvider);
+    if (activeProvider == null || activeProvider.apiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('AI sağlayıcısı veya API anahtarı ayarlanmamış', style: GoogleFonts.dmSans()),
+          action: SnackBarAction(
+            label: 'Ayarlar',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AISettingsScreen()),
+            ),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withAlpha(25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.psychology_rounded, color: AppColors.accent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sorgu Açıklaması',
+                          style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          'AI ile doğal dilde analiz',
+                          style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Text(
+                  sql,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FutureBuilder<String>(
+                future: ref.read(aiServiceProvider).explainSql(
+                      sql: sql,
+                      tables: tablesState.tables,
+                      provider: activeProvider,
+                    ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.accent),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'AI sorguyu analiz ediyor...',
+                            style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withAlpha(15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Açıklama alınamadı: ${snapshot.error}',
+                        style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.error),
+                      ),
+                    );
+                  }
+                  final explanation = snapshot.data ?? 'Açıklama üretilemedi.';
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: SelectableText(
+                      explanation,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: () => Navigator.pop(sheetContext),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Kapat'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -926,6 +1405,8 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 _buildModePill('Analiz', 1, Icons.analytics_rounded),
                 const SizedBox(width: 8),
                 _buildModePill('SQL Konsol', 2, Icons.code_rounded),
+                const SizedBox(width: 8),
+                _buildAiPill(tablesState),
               ],
             ),
           ),
@@ -1036,6 +1517,36 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     );
   }
 
+  Widget _buildAiPill(TablesState tablesState) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _showAiGenerateSheet(tablesState),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withAlpha(22),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.accent.withAlpha(90)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_awesome_rounded, size: 15, color: AppColors.accent),
+            const SizedBox(width: 6),
+            Text(
+              'AI ile Yaz',
+              style: GoogleFonts.dmSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accent,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildManualEditor(TablesState tablesState, QueryTabModel tab, QueryState queryState) {
     final availableTableNames = tablesState.tables.map((t) => t.name).toList();
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
@@ -1104,6 +1615,10 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                     color: AppColors.surface,
                     onSelected: (value) {
                       switch (value) {
+                        case 'ai_generate':
+                          _showAiGenerateSheet(tablesState);
+                        case 'ai_explain':
+                          _showAiExplainSheet(tab, tablesState);
                         case 'explain':
                           _showQueryPlan(tab);
                         case 'copy':
@@ -1112,7 +1627,28 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                           setState(() => tab.sqlController.clear());
                       }
                     },
-                    itemBuilder: (context) => const [
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'ai_generate',
+                        child: Row(
+                          children: [
+                            Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.accent),
+                            const SizedBox(width: 10),
+                            const Text('AI ile Sorgu Yaz', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'ai_explain',
+                        child: Row(
+                          children: [
+                            Icon(Icons.psychology_rounded, size: 18, color: AppColors.accent),
+                            const SizedBox(width: 10),
+                            const Text('AI ile Sorguyu Açıkla'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuDivider(),
                       PopupMenuItem(
                         value: 'explain',
                         child: Row(

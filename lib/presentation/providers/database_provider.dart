@@ -27,6 +27,7 @@ final dataProfilerServiceProvider = Provider<DataProfilerService>((ref) {
 
 class TablesState {
   final List<TableSchema> tables;
+  final List<TableSchema> localTables;
   final List<RecentFile> recentFiles;
   final bool isLoading;
   final String? errorMessage;
@@ -36,6 +37,7 @@ class TablesState {
 
   const TablesState({
     this.tables = const [],
+    this.localTables = const [],
     this.recentFiles = const [],
     this.isLoading = false,
     this.errorMessage,
@@ -46,6 +48,7 @@ class TablesState {
 
   TablesState copyWith({
     List<TableSchema>? tables,
+    List<TableSchema>? localTables,
     List<RecentFile>? recentFiles,
     bool? isLoading,
     String? errorMessage,
@@ -56,6 +59,7 @@ class TablesState {
   }) {
     return TablesState(
       tables: tables ?? this.tables,
+      localTables: localTables ?? this.localTables,
       recentFiles: recentFiles ?? this.recentFiles,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -78,6 +82,10 @@ class TablesNotifier extends StateNotifier<TablesState> {
     refreshTables();
   }
 
+  void refreshLocalTables() {
+    state = state.copyWith(localTables: _engine.getTables());
+  }
+
   Future<void> refreshTables() async {
     state = state.copyWith(
       isLoading: true,
@@ -85,11 +93,13 @@ class TablesNotifier extends StateNotifier<TablesState> {
       connectionLabel: _session.label,
       clearError: true,
     );
+    final localTables = _engine.getTables();
     try {
       final tables = await _session.getTables();
       final recentFiles = _engine.getRecentFiles();
       state = state.copyWith(
         tables: tables,
+        localTables: localTables,
         recentFiles: recentFiles,
         isLoading: false,
         isRemote: _session.isRemote,
@@ -98,6 +108,7 @@ class TablesNotifier extends StateNotifier<TablesState> {
       );
     } catch (e) {
       state = state.copyWith(
+        localTables: localTables,
         isLoading: false,
         errorMessage: e.toString(),
         isRemote: _session.isRemote,
@@ -171,8 +182,8 @@ class TablesNotifier extends StateNotifier<TablesState> {
     await importFromFile(filePath: recent.filePath, fileName: recent.fileName);
   }
 
-  void markTableAccessed(String tableName) {
-    if (_session.isRemote) return;
+  void markTableAccessed(String tableName, {bool local = false}) {
+    if (_session.isRemote && !local) return;
     _engine.markTableAccessed(tableName);
   }
 
@@ -181,8 +192,8 @@ class TablesNotifier extends StateNotifier<TablesState> {
     refreshTables();
   }
 
-  Future<void> dropTable(String tableName) async {
-    if (_session.isRemote) return;
+  Future<void> dropTable(String tableName, {bool local = false}) async {
+    if (_session.isRemote && !local) return;
     state = state.copyWith(isLoading: true);
     await Future.delayed(const Duration(milliseconds: 150));
     _engine.dropTable(tableName);

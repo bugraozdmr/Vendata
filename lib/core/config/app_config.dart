@@ -5,6 +5,8 @@ class AppConfig {
 
   static String appName = 'Vendata';
   static String appVersion = '1.0.0';
+  static String openRouterApiKey = '';
+  static String geminiApiKey = '';
 
   static Future<void> init() async {
     try {
@@ -18,6 +20,8 @@ class AppConfig {
           final val = parts.sublist(1).join('=').trim();
           if (key == 'APP_NAME') appName = val;
           if (key == 'APP_VERSION') appVersion = val;
+          if (key == 'OPENROUTER_API_KEY') openRouterApiKey = val;
+          if (key == 'GEMINI_API_KEY') geminiApiKey = val;
         }
       }
     } catch (_) {}

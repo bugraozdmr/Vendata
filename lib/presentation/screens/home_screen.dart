@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../providers/database_provider.dart';
 import '../providers/theme_provider.dart';
 import 'connections_screen.dart';
+import 'ai_chat_screen.dart';
 import 'settings_screen.dart';
 import 'sql_screen.dart';
 import 'tables_screen.dart';
@@ -109,6 +110,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final pages = [
       TablesScreen(onNavigateToSql: _navigateToQuery),
       SqlScreen(targetTable: _selectedTableForQuery),
+      AiChatScreen(onNavigateToSql: (sql, tableName) {
+        if (tableName != null) {
+          _selectedTableForQuery = tableName;
+        }
+        ref.read(queryProvider.notifier).setSql(sql);
+        setState(() => _currentIndex = 1);
+      }),
       ConnectionsScreen(onConnected: () => setState(() => _currentIndex = 0)),
       SettingsScreen(onOpenQuery: _openQueryFromHistory),
     ];
@@ -206,12 +214,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const Spacer(),
                     _buildRailItem(index: 0, icon: Icons.grid_view_rounded, tooltip: 'Tablolar'),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     _buildRailItem(index: 1, icon: Icons.terminal_rounded, tooltip: 'SQL'),
-                    const SizedBox(height: 14),
-                    _buildRailItem(index: 2, icon: Icons.dns_rounded, tooltip: 'Bağlantılar'),
-                    const SizedBox(height: 14),
-                    _buildRailItem(index: 3, icon: Icons.tune_rounded, tooltip: 'Ayarlar'),
+                    const SizedBox(height: 12),
+                    _buildRailItem(index: 2, icon: Icons.auto_awesome_rounded, tooltip: 'AI Sohbet'),
+                    const SizedBox(height: 12),
+                    _buildRailItem(index: 3, icon: Icons.dns_rounded, tooltip: 'Bağlantılar'),
+                    const SizedBox(height: 12),
+                    _buildRailItem(index: 4, icon: Icons.tune_rounded, tooltip: 'Ayarlar'),
                     const Spacer(),
                   ],
                 ),
@@ -271,7 +281,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottom: true,
       minimum: const EdgeInsets.only(bottom: 12),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 48),
+        margin: const EdgeInsets.symmetric(horizontal: 28),
         height: 58,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
@@ -290,8 +300,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             _buildNavItem(index: 0, icon: Icons.grid_view_rounded),
             _buildNavItem(index: 1, icon: Icons.terminal_rounded),
-            _buildNavItem(index: 2, icon: Icons.dns_rounded),
-            _buildNavItem(index: 3, icon: Icons.tune_rounded),
+            _buildNavItem(index: 2, icon: Icons.auto_awesome_rounded),
+            _buildNavItem(index: 3, icon: Icons.dns_rounded),
+            _buildNavItem(index: 4, icon: Icons.tune_rounded),
           ],
         ),
       ),
@@ -320,7 +331,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
-        width: isSelected ? 62 : 46,
+        width: isSelected ? 56 : 42,
         height: 44,
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accent : Colors.transparent,
@@ -329,7 +340,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Center(
           child: Icon(
             icon,
-            size: 22,
+            size: 21,
             color: isSelected ? Colors.white : Colors.white.withAlpha(140),
           ),
         ),
