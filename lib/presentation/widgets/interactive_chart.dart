@@ -264,39 +264,34 @@ class _InteractiveChartState extends State<InteractiveChart> {
   Widget _buildTypeChip(String label, ChartType type, IconData icon) {
     final isSelected = widget.config.type == type;
     return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _touchedIndex = null;
-          });
-          widget.onConfigChanged(widget.config.copyWith(type: type));
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : AppColors.cardMuted,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.dmSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : AppColors.textSecondary,
-                  ),
-                ),
+      child: Tooltip(
+        message: label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            setState(() {
+              _touchedIndex = null;
+            });
+            widget.onConfigChanged(widget.config.copyWith(type: type));
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.accent : AppColors.cardMuted,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isSelected ? AppColors.accent : AppColors.border,
+                width: 1,
               ),
-            ],
+            ),
+            child: Center(
+              child: Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
           ),
         ),
       ),

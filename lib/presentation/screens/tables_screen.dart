@@ -726,9 +726,11 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: previewOnly
-                  ? () => _showLocalPreview(table)
-                  : () => _showTableDetailsAndQueriesSheet(context, table),
+              onTap: () => _showTableDetailsAndQueriesSheet(
+                context,
+                table,
+                isLocalSource: localSource,
+              ),
               child: Row(
                 children: [
                   Container(
@@ -943,7 +945,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     );
   }
 
-  void _showTableDetailsAndQueriesSheet(BuildContext context, TableSchema table) {
+  void _showTableDetailsAndQueriesSheet(BuildContext context, TableSchema table, {bool isLocalSource = false}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -952,12 +954,13 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
         builder: (context, ref, _) {
           final qState = ref.watch(queryProvider);
           final tableQueries = qState.savedQueries.where((q) => q.tableName == table.name).toList();
+          final isRemote = ref.watch(tablesProvider).isRemote;
 
           return Container(
             height: MediaQuery.of(context).size.height * 0.78,
             decoration: BoxDecoration(
               color: AppColors.background,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Column(
               children: [
@@ -1028,9 +1031,31 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                     physics: const BouncingScrollPhysics(),
                     children: [
                       // Sütunlar
-                      Text(
-                        'Sütunlar (${table.columns.length})',
-                        style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Sütunlar (${table.columns.length})',
+                            style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                          ),
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _showLocalPreview(table);
+                            },
+                            child: Row(
+                              children: [
+                                Icon(Icons.table_view_rounded, size: 14, color: AppColors.accent),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Verileri Gör',
+                                  style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -1114,16 +1139,28 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        ref.read(tablesProvider.notifier).markTableAccessed(table.name);
-                        widget.onNavigateToSql(table.name);
+                        if (isRemote && isLocalSource) {
+                          ref.read(connectionsProvider.notifier).disconnect();
+                          ref.read(tablesProvider.notifier).markTableAccessed(table.name, local: true);
+                          widget.onNavigateToSql(table.name);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('"${table.name}" için yerel SQLite moduna geçildi.'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          ref.read(tablesProvider.notifier).markTableAccessed(table.name);
+                          widget.onNavigateToSql(table.name);
+                        }
                       },
                       icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
                       label: Text(
-                        'Bu Tabloyu Sorgula',
+                        (isRemote && isLocalSource) ? 'Yerel Modda Sorgula' : 'Bu Tabloyu Sorgula',
                         style: GoogleFonts.dmSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: (isRemote && isLocalSource) ? AppColors.accent : AppColors.primary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),

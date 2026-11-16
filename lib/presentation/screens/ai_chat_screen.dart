@@ -995,14 +995,33 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                               ),
                               trailing: isSelected
                                   ? Icon(Icons.check_circle_rounded, color: AppColors.accent, size: 22)
-                                  : null,
-                              onTap: () async {
-                                if (!isSelected) {
-                                  await ref.read(connectionsProvider.notifier).connect(conn);
-                                  ref.read(aiChatProvider.notifier).setSelectedTable(null);
-                                }
-                                if (ctx.mounted) Navigator.pop(ctx);
-                              },
+                                  : (connState.isConnecting
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                                        )
+                                      : null),
+                              onTap: connState.isConnecting
+                                  ? null
+                                  : () async {
+                                      if (!isSelected) {
+                                        final success = await ref.read(connectionsProvider.notifier).connect(conn);
+                                        if (success) {
+                                          ref.read(aiChatProvider.notifier).setSelectedTable(null);
+                                          await ref.read(tablesProvider.notifier).refreshTables();
+                                        } else if (context.mounted) {
+                                          final err = ref.read(connectionsProvider).errorMessage ?? 'Bağlantı kurulamadı.';
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(err),
+                                              backgroundColor: AppColors.error,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                    },
                             );
                           }),
                         ],

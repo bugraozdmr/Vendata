@@ -199,8 +199,9 @@ class AiQueryIntent {
   });
 
   factory AiQueryIntent.fromJson(Map<String, dynamic> json) {
+    final rawSql = json['sql'] as String?;
     return AiQueryIntent(
-      sql: json['sql'] as String?,
+      sql: sanitizeSql(rawSql),
       intent: json['intent'] as String? ?? 'text',
       chartType: json['chartType'] as String?,
       chartX: json['chartX'] as String?,
@@ -209,5 +210,59 @@ class AiQueryIntent {
     );
   }
 
-  bool get hasSql => sql != null && sql!.trim().isNotEmpty;
+  bool get hasSql {
+    final s = sanitizeSql(sql);
+    return s != null && s.isNotEmpty;
+  }
+
+  /// Sanitizes SQL string, stripping markdown fences or embedded JSON wrappers.
+  /// Returns null if the string is empty or not a valid executable SQL statement.
+  static String? sanitizeSql(String? raw) {
+    if (raw == null) return null;
+    var s = raw.trim();
+    if (s.isEmpty) return null;
+
+    // Remove markdown code fences
+    if (s.startsWith('```sql')) {
+      s = s.substring(6);
+    } else if (s.startsWith('```')) {
+      s = s.substring(3);
+    }
+    if (s.endsWith('```')) {
+      s = s.substring(0, s.length - 3);
+    }
+    s = s.trim();
+
+    // If it's a JSON block or starts with {
+    if (s.startsWith('{')) {
+      final match = RegExp(r'"sql"\s*:\s*"((?:\\.|[^"\\])*)"', dotAll: true).firstMatch(s);
+      if (match != null) {
+        s = match.group(1)!.replaceAll(r'\"', '"').replaceAll(r'\n', '\n').trim();
+      } else {
+        final matchLoose = RegExp(r'"sql"\s*:\s*"([a-zA-Z\s\S]+?)(?:"\s*,\s*"|"\s*})', dotAll: true).firstMatch(s);
+        if (matchLoose != null) {
+          s = matchLoose.group(1)!.replaceAll(r'\"', '"').trim();
+        } else {
+          return null;
+        }
+      }
+    }
+
+    // Must start with an allowed SQL keyword
+    final upper = s.toUpperCase().trimLeft();
+    if (!upper.startsWith('SELECT') &&
+        !upper.startsWith('WITH') &&
+        !upper.startsWith('SHOW') &&
+        !upper.startsWith('DESCRIBE') &&
+        !upper.startsWith('EXPLAIN')) {
+      return null;
+    }
+
+    // Guard against leftover JSON brackets or keys
+    if (s.startsWith('{') || s.contains('"sql":')) {
+      return null;
+    }
+
+    return s;
+  }
 }

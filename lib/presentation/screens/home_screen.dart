@@ -21,6 +21,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
   String? _selectedTableForQuery;
+  String? _initialSqlForQuery;
+  int _sqlTriggerCounter = 0;
   final QuickActions _quickActions = const QuickActions();
 
   @override
@@ -92,14 +94,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _navigateToQuery(String tableName) {
     setState(() {
       _selectedTableForQuery = tableName;
+      _initialSqlForQuery = null;
       _currentIndex = 1;
     });
   }
 
   void _openQueryFromHistory(String sql) {
     ref.read(queryProvider.notifier).setSql(sql);
-    ref.read(queryProvider.notifier).runQuery(sql);
-    setState(() => _currentIndex = 1);
+    setState(() {
+      _initialSqlForQuery = sql;
+      _sqlTriggerCounter++;
+      _currentIndex = 1;
+    });
   }
 
   @override
@@ -109,15 +115,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final pages = [
       TablesScreen(onNavigateToSql: _navigateToQuery),
-      SqlScreen(targetTable: _selectedTableForQuery),
+      SqlScreen(
+        targetTable: _selectedTableForQuery,
+        initialSql: _initialSqlForQuery,
+        sqlTriggerId: _sqlTriggerCounter,
+      ),
       AiChatScreen(
         onBackToHome: () => setState(() => _currentIndex = 0),
         onNavigateToSql: (sql, tableName) {
-          if (tableName != null) {
+          setState(() {
             _selectedTableForQuery = tableName;
-          }
-          ref.read(queryProvider.notifier).setSql(sql);
-          setState(() => _currentIndex = 1);
+            _initialSqlForQuery = sql;
+            _sqlTriggerCounter++;
+            _currentIndex = 1;
+          });
         },
       ),
       ConnectionsScreen(onConnected: () => setState(() => _currentIndex = 0)),

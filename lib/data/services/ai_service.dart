@@ -63,7 +63,7 @@ Output Rules:
       systemPrompt: systemPrompt,
       userPrompt: userPrompt,
       provider: provider,
-      maxTokens: 800,
+      maxTokens: 1200,
     );
 
     return _parseIntentFromJson(rawContent);
@@ -332,15 +332,16 @@ Keep the explanation under 4 sentences.
     final cleaned = _extractJsonBlock(rawJson);
     try {
       final map = jsonDecode(cleaned) as Map<String, dynamic>;
-      final sql = map['sql'] as String?;
-      final intent = map['intent'] as String? ?? (sql != null ? 'table' : 'text');
+      final rawSql = map['sql'] as String?;
+      final cleanSql = AiQueryIntent.sanitizeSql(rawSql);
+      final intent = map['intent'] as String? ?? (cleanSql != null ? 'table' : 'text');
       final chartType = map['chartType'] as String?;
       final chartX = map['chartX'] as String?;
       final chartY = map['chartY'] as String?;
       final explanation = map['explanation'] as String? ?? '';
 
       return AiQueryIntent(
-        sql: (sql != null && sql.trim().isNotEmpty) ? _cleanSqlOutput(sql) : null,
+        sql: cleanSql,
         intent: intent,
         chartType: chartType,
         chartX: chartX,
@@ -349,18 +350,29 @@ Keep the explanation under 4 sentences.
       );
     } catch (_) {
       // Fallback 1: Extract "sql" and "explanation" using regex if JSON was truncated
-      final sqlMatch = RegExp(r'"sql"\s*:\s*"((?:\\.|[^"\\])*)"').firstMatch(cleaned);
-      final explMatch = RegExp(r'"explanation"\s*:\s*"((?:\\.|[^"\\])*)"?').firstMatch(cleaned);
+      final sqlMatch = RegExp(r'"sql"\s*:\s*"((?:\\.|[^"\\])*)"', dotAll: true).firstMatch(cleaned);
+      final explMatch = RegExp(r'"explanation"\s*:\s*"((?:\\.|[^"\\])*)"?', dotAll: true).firstMatch(cleaned);
       final intentMatch = RegExp(r'"intent"\s*:\s*"([a-zA-Z]+)"').firstMatch(cleaned);
 
+      String? extractedSql;
       if (sqlMatch != null) {
         var sql = sqlMatch.group(1) ?? '';
         sql = sql.replaceAll(r'\"', '"').replaceAll(r'\n', '\n').trim();
+        extractedSql = AiQueryIntent.sanitizeSql(sql);
+      } else {
+        // Fallback for truncated/unclosed sql string:
+        final unclosed = RegExp(r'"sql"\s*:\s*"((?:SELECT|WITH|SHOW|DESCRIBE)\b[^"\r\n]+)', caseSensitive: false, dotAll: true).firstMatch(cleaned);
+        if (unclosed != null) {
+          extractedSql = AiQueryIntent.sanitizeSql(unclosed.group(1));
+        }
+      }
+
+      if (extractedSql != null) {
         var explanation = explMatch?.group(1)?.replaceAll(r'\"', '"').trim() ?? 'SQL sorgusu oluşturuldu.';
         final intent = intentMatch?.group(1) ?? 'table';
 
         return AiQueryIntent(
-          sql: _cleanSqlOutput(sql),
+          sql: extractedSql,
           intent: intent,
           explanation: explanation,
         );
@@ -369,12 +381,14 @@ Keep the explanation under 4 sentences.
       // Fallback 2: Check if raw text starts with SELECT/WITH (clean SQL only, never JSON)
       final upper = cleaned.toUpperCase();
       if (!cleaned.contains('{') && (upper.startsWith('SELECT ') || upper.startsWith('WITH '))) {
-        final extractedSql = _cleanSqlOutput(cleaned);
-        return AiQueryIntent(
-          sql: extractedSql,
-          intent: 'table',
-          explanation: 'SQL sorgusu oluşturuldu.',
-        );
+        final extracted = AiQueryIntent.sanitizeSql(cleaned);
+        if (extracted != null) {
+          return AiQueryIntent(
+            sql: extracted,
+            intent: 'table',
+            explanation: 'SQL sorgusu oluşturuldu.',
+          );
+        }
       }
 
       return AiQueryIntent(
@@ -415,6 +429,7 @@ Keep the explanation under 4 sentences.
     if (s.endsWith('```')) {
       s = s.substring(0, s.length - 3);
     }
-    return s.trim();
+    final sanitized = AiQueryIntent.sanitizeSql(s);
+    return sanitized ?? s.trim();
   }
 }

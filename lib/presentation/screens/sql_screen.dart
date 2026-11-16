@@ -55,8 +55,15 @@ class QueryTabModel {
 
 class SqlScreen extends ConsumerStatefulWidget {
   final String? targetTable;
+  final String? initialSql;
+  final int? sqlTriggerId;
 
-  const SqlScreen({super.key, this.targetTable});
+  const SqlScreen({
+    super.key,
+    this.targetTable,
+    this.initialSql,
+    this.sqlTriggerId,
+  });
 
   @override
   ConsumerState<SqlScreen> createState() => _SqlScreenState();
@@ -77,9 +84,11 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final quotedInitial = initialTable != null && initialTable.isNotEmpty
         ? ref.read(sessionProvider).quoteIdentifier(initialTable)
         : '';
-    final initialSql = (initialTable != null && initialTable.isNotEmpty)
-        ? 'SELECT * FROM $quotedInitial LIMIT 50;'
-        : '';
+    final initialSql = (widget.initialSql != null && widget.initialSql!.isNotEmpty)
+        ? widget.initialSql!
+        : ((initialTable != null && initialTable.isNotEmpty)
+            ? 'SELECT * FROM $quotedInitial LIMIT 50;'
+            : '');
     final initialTitle = (initialTable != null && initialTable.isNotEmpty)
         ? initialTable
         : 'Sorgu 1';
@@ -89,7 +98,9 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
       title: initialTitle,
       sqlController: TextEditingController(text: initialSql),
       activeTable: initialTable,
-      queryMode: (initialTable != null && initialTable.isNotEmpty) ? 0 : 2,
+      queryMode: (widget.initialSql != null && widget.initialSql!.isNotEmpty)
+          ? 2
+          : ((initialTable != null && initialTable.isNotEmpty) ? 0 : 2),
       activeTab: 0,
     ));
     _selectedTabIndex = 0;
@@ -99,7 +110,14 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
   @override
   void didUpdateWidget(covariant SqlScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.targetTable != oldWidget.targetTable && widget.targetTable != null) {
+    if (widget.sqlTriggerId != oldWidget.sqlTriggerId &&
+        widget.initialSql != null &&
+        widget.initialSql!.isNotEmpty) {
+      _addNewTab(
+        tableName: widget.targetTable,
+        initialSql: widget.initialSql,
+      );
+    } else if (widget.targetTable != oldWidget.targetTable && widget.targetTable != null) {
       final existingIdx = _tabs.indexWhere((t) => t.activeTable == widget.targetTable);
       if (existingIdx != -1) {
         setState(() {
@@ -121,9 +139,11 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
 
   void _addNewTab({String? tableName, String? initialSql}) {
     final count = _tabCounter++;
-    final sql = (tableName != null && tableName.isNotEmpty)
-        ? 'SELECT * FROM ${ref.read(sessionProvider).quoteIdentifier(tableName)} LIMIT 50;'
-        : (initialSql ?? '');
+    final sql = (initialSql != null && initialSql.isNotEmpty)
+        ? initialSql
+        : ((tableName != null && tableName.isNotEmpty)
+            ? 'SELECT * FROM ${ref.read(sessionProvider).quoteIdentifier(tableName)} LIMIT 50;'
+            : '');
     final title = (tableName != null && tableName.isNotEmpty)
         ? tableName
         : 'Sorgu $count';

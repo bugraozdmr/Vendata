@@ -123,5 +123,28 @@ void main() {
       expect(reconstructedPinned.isPinned, true);
       expect(reconstructedPinned.title, 'Önemli Satışlar');
     });
+
+    test('AiQueryIntent.sanitizeSql extracts clean SQL and rejects raw JSON', () {
+      // 1. Raw JSON string passed as SQL must be extracted or rejected
+      const jsonRaw = '{\n  "sql": "SELECT count(*) FROM users;",\n  "intent": "scalar"\n}';
+      final cleaned = AiQueryIntent.sanitizeSql(jsonRaw);
+      expect(cleaned, 'SELECT count(*) FROM users;');
+
+      // 2. Markdown fenced SQL
+      const fencedSql = '```sql\nSELECT * FROM orders LIMIT 10;\n```';
+      expect(AiQueryIntent.sanitizeSql(fencedSql), 'SELECT * FROM orders LIMIT 10;');
+
+      // 3. Plain valid SQL
+      const plainSql = 'SELECT id, name FROM customers;';
+      expect(AiQueryIntent.sanitizeSql(plainSql), plainSql);
+
+      // 4. Non-SQL conversational text must return null
+      const nonSql = 'Merhaba, size nasıl yardımcı olabilirim?';
+      expect(AiQueryIntent.sanitizeSql(nonSql), isNull);
+
+      // 5. Empty or null
+      expect(AiQueryIntent.sanitizeSql(''), isNull);
+      expect(AiQueryIntent.sanitizeSql(null), isNull);
+    });
   });
 }

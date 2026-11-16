@@ -280,10 +280,17 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
         ? 'Uzak Veritabanı Sunucusu: ${connState.activeConnection!.name} (${connState.activeConnection!.type.label}) - Veritabanı: ${connState.activeConnection!.database}'
         : 'Yerel Veritabanı (İçe aktarılan CSV / Excel dosyaları ve yerel tablolar)';
 
+    var tables = tablesState.tables;
+    if (tables.isEmpty) {
+      try {
+        tables = await session.getTables();
+      } catch (_) {}
+    }
+
     try {
       final intent = await _aiService.generateQueryIntent(
         question: trimmed,
-        tables: tablesState.tables,
+        tables: tables,
         activeTableName: state.selectedTable,
         dataSourceDescription: sourceDesc,
         previousMessages: state.messages,
@@ -298,10 +305,11 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
       String? serializedResult;
 
       // 4. Run SQL Query if generated
-      if (intent.hasSql) {
+      if (intent.hasSql && intent.sql != null) {
+        final cleanSql = intent.sql!;
         final stopwatch = Stopwatch()..start();
         try {
-          final qResult = await session.execute(intent.sql!, tableName: state.selectedTable);
+          final qResult = await session.execute(cleanSql, tableName: state.selectedTable);
           queryResult = qResult;
           stopwatch.stop();
           execTime = stopwatch.elapsedMilliseconds;
@@ -343,7 +351,7 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
         conversationId: activeConv.id,
         role: 'assistant',
         content: intent.explanation,
-        sqlQuery: intent.sql,
+        sqlQuery: intent.hasSql ? intent.sql : null,
         resultJson: serializedResult,
         chartType: intent.intent == 'chart' ? (intent.chartType ?? 'bar') : null,
         chartX: finalChartX,
