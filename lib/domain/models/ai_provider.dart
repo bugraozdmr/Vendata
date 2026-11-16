@@ -30,6 +30,25 @@ class AIProviderModel {
     return combined.toList();
   }
 
+  String get assetLogo {
+    switch (providerType.toLowerCase()) {
+      case 'gemini':
+        return 'assets/gemini.webp';
+      case 'openrouter':
+        return 'assets/oepnrouter.png';
+      case 'openai':
+        return 'assets/gpt.webp';
+      case 'deepseek':
+        return 'assets/deepseek.png';
+      case 'groq':
+        return 'assets/groq.png';
+      case 'ollama':
+      case 'custom':
+      default:
+        return 'assets/ollama.webp';
+    }
+  }
+
   AIProviderModel copyWith({
     String? id,
     String? name,

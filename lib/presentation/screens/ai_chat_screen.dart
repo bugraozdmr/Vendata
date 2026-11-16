@@ -83,7 +83,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             // Message List or Empty Suggestions
             Expanded(
               child: chatState.messages.isEmpty
-                  ? _buildEmptyState(availableTables, chatState.selectedTable)
+                  ? _buildEmptyState(availableTables, chatState.selectedTable, activeAi)
                   : ListView.builder(
                       controller: _scrollController,
                       physics: const BouncingScrollPhysics(),
@@ -93,6 +93,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                         final msg = chatState.messages[index];
                         return _MessageBubble(
                           message: msg,
+                          activeAiLogo: activeAi?.assetLogo,
                           onNavigateToSql: widget.onNavigateToSql,
                         );
                       },
@@ -129,15 +130,22 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         children: [
           Row(
             children: [
-              // Sparkle icon
+              // Active AI Brand Logo or Sparkle
               Container(
                 width: 38,
                 height: 38,
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: AppColors.accentLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
+                child: activeAi != null
+                    ? Image.asset(
+                        activeAi.assetLogo,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
+                      )
+                    : Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
               ),
               const SizedBox(width: 10),
               // Title & Conversations picker
@@ -185,17 +193,37 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: (activeAi != null && activeAi.apiKey.isNotEmpty)
-                              ? AppColors.success
-                              : AppColors.warning,
-                          shape: BoxShape.circle,
+                      if (activeAi != null) ...[
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: Image.asset(
+                            activeAi.assetLogo,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: (activeAi.apiKey.isNotEmpty)
+                                    ? AppColors.success
+                                    : AppColors.warning,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
+                        const SizedBox(width: 6),
+                      ] else ...[
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: AppColors.warning,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Text(
                         activeAi != null ? activeAi.modelName : 'Model Yok',
                         style: GoogleFonts.spaceGrotesk(
@@ -290,7 +318,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildEmptyState(List<dynamic> tables, String? selectedTable) {
+  Widget _buildEmptyState(List<dynamic> tables, String? selectedTable, dynamic activeAi) {
     final tableName = selectedTable ?? (tables.isNotEmpty ? tables.first.name : null);
 
     return SingleChildScrollView(
@@ -300,13 +328,20 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         children: [
           const SizedBox(height: 18),
           Container(
-            width: 60,
-            height: 60,
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.accentLight,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 30),
+            child: activeAi != null
+                ? Image.asset(
+                    activeAi.assetLogo,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 30),
+                  )
+                : Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 30),
           ),
           const SizedBox(height: 16),
           Text(
@@ -585,10 +620,12 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
 
 class _MessageBubble extends StatefulWidget {
   final AiMessage message;
+  final String? activeAiLogo;
   final void Function(String sql, String? tableName)? onNavigateToSql;
 
   const _MessageBubble({
     required this.message,
+    this.activeAiLogo,
     this.onNavigateToSql,
   });
 
@@ -657,13 +694,18 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 Container(
                   width: 26,
                   height: 26,
+                  padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
                     color: AppColors.accentLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Center(
-                    child: Icon(Icons.auto_awesome_rounded, size: 14, color: AppColors.accent),
-                  ),
+                  child: widget.activeAiLogo != null
+                      ? Image.asset(
+                          widget.activeAiLogo!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, size: 14, color: AppColors.accent),
+                        )
+                      : Icon(Icons.auto_awesome_rounded, size: 14, color: AppColors.accent),
                 ),
                 const SizedBox(width: 8),
                 Text(

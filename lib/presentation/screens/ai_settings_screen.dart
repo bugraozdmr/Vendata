@@ -67,13 +67,18 @@ class _AISettingsScreenState extends ConsumerState<AISettingsScreen> {
                   Container(
                     width: 44,
                     height: 44,
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       color: AppColors.accentLight,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Center(
-                      child: Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 22),
-                    ),
+                    child: active != null
+                        ? Image.asset(
+                            active.assetLogo,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 22),
+                          )
+                        : Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 22),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -373,6 +378,22 @@ class _ProviderCardState extends ConsumerState<_ProviderCard> {
                           ),
                         )
                       : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 36,
+                height: 36,
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: AppColors.cardMuted,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Image.asset(
+                  p.assetLogo,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.accent),
                 ),
               ),
               const SizedBox(width: 12),

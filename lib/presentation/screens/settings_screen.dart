@@ -102,12 +102,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 42,
+                height: 42,
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: AppColors.accentLight,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(Icons.auto_awesome_rounded, size: 20, color: AppColors.accent),
+                child: activeAi != null
+                    ? Image.asset(
+                        activeAi.assetLogo,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, size: 20, color: AppColors.accent),
+                      )
+                    : Icon(Icons.auto_awesome_rounded, size: 20, color: AppColors.accent),
               ),
               const SizedBox(width: 12),
               Expanded(

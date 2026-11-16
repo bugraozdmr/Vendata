@@ -80,17 +80,21 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
           physics: const BouncingScrollPhysics(),
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Bağlantılar',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -1.0,
+                Expanded(
+                  child: Text(
+                    'Bağlantılar',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.8,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -257,12 +261,19 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 44,
+            height: 44,
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: statusColor.withAlpha(90), width: 1.2),
             ),
-            child: Icon(_iconFor(connection.type), size: 20, color: statusColor),
+            child: Image.asset(
+              connection.type.assetLogo,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Icon(_iconFor(connection.type), size: 22, color: statusColor),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -401,12 +412,19 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 42,
+            height: 42,
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: AppColors.cardMuted,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
             ),
-            child: Icon(_iconFor(connection.type), size: 20, color: AppColors.textPrimary),
+            child: Image.asset(
+              connection.type.assetLogo,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Icon(_iconFor(connection.type), size: 20, color: AppColors.textPrimary),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1018,12 +1036,20 @@ class _ConnectionFormSheetState extends ConsumerState<_ConnectionFormSheet> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    type == DbType.postgresql ? Icons.storage_rounded : Icons.dns_rounded,
-                    size: 18,
-                    color: selected ? Colors.white : AppColors.textSecondary,
+                  Container(
+                    width: 22,
+                    height: 22,
+                    margin: const EdgeInsets.only(right: 8),
+                    child: Image.asset(
+                      type.assetLogo,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        type == DbType.postgresql ? Icons.storage_rounded : Icons.dns_rounded,
+                        size: 18,
+                        color: selected ? Colors.white : AppColors.textSecondary,
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       type.label,

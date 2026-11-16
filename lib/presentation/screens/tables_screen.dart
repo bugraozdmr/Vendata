@@ -8,6 +8,7 @@ import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/file_helper.dart';
 import '../../data/services/db_session.dart';
+import '../../domain/models/db_connection.dart';
 import '../../domain/models/query_result.dart';
 import '../../domain/models/recent_file.dart';
 import '../../domain/models/saved_query.dart';
@@ -199,6 +200,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                 activeConnection == null
                     ? const ConnectionHealth()
                     : connectionsState.healthFor(activeConnection.id),
+                activeConnection,
               ),
               const SizedBox(height: 12),
               _buildSourceSwitcher(tablesState, showLocal: showLocal),
@@ -430,7 +432,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     );
   }
 
-  Widget _buildRemoteBanner(TablesState tablesState, ConnectionHealth health) {
+  Widget _buildRemoteBanner(TablesState tablesState, ConnectionHealth health, DbConnection? activeConnection) {
     final healthColor = _healthColor(health);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -442,12 +444,21 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 36,
+            height: 36,
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: healthColor.withAlpha(50)),
             ),
-            child: Icon(Icons.dns_rounded, size: 18, color: healthColor),
+            child: activeConnection != null
+                ? Image.asset(
+                    activeConnection.type.assetLogo,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(Icons.dns_rounded, size: 18, color: healthColor),
+                  )
+                : Icon(Icons.dns_rounded, size: 18, color: healthColor),
           ),
           const SizedBox(width: 12),
           Expanded(

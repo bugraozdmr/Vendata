@@ -7,6 +7,7 @@ class AIProviderPreset {
   final String defaultModel;
   final String description;
   final String apiKeyHelpUrl;
+  final String assetLogo;
 
   const AIProviderPreset({
     required this.id,
@@ -17,6 +18,7 @@ class AIProviderPreset {
     required this.defaultModel,
     required this.description,
     required this.apiKeyHelpUrl,
+    required this.assetLogo,
   });
 }
 
@@ -43,6 +45,7 @@ abstract final class AIProvidersConstants {
       defaultModel: 'gemini-1.5-flash',
       description: 'Hızlı, güçlü ve yüksek kotalı resmi Google modeli.',
       apiKeyHelpUrl: 'https://aistudio.google.com/apikey',
+      assetLogo: 'assets/gemini.webp',
     ),
 
     // 2. OpenRouter
@@ -61,6 +64,7 @@ abstract final class AIProvidersConstants {
       defaultModel: 'deepseek/deepseek-chat',
       description: 'DeepSeek, Claude, Llama ve OpenAI dahil yüzlerce modeli tek API ile sunar.',
       apiKeyHelpUrl: 'https://openrouter.ai/keys',
+      assetLogo: 'assets/oepnrouter.png',
     ),
 
     // 3. OpenAI (ChatGPT)
@@ -77,6 +81,7 @@ abstract final class AIProvidersConstants {
       defaultModel: 'gpt-4o-mini',
       description: 'Resmi OpenAI ChatGPT modelleri.',
       apiKeyHelpUrl: 'https://platform.openai.com/api-keys',
+      assetLogo: 'assets/gpt.webp',
     ),
 
     // 4. DeepSeek
@@ -92,6 +97,7 @@ abstract final class AIProvidersConstants {
       defaultModel: 'deepseek-chat',
       description: 'Gelişmiş akıl yürütme ve son derece uygun maliyetli DeepSeek modelleri.',
       apiKeyHelpUrl: 'https://platform.deepseek.com/api_keys',
+      assetLogo: 'assets/deepseek.png',
     ),
 
     // 5. Groq
@@ -108,8 +114,28 @@ abstract final class AIProvidersConstants {
       defaultModel: 'llama-3.3-70b-versatile',
       description: 'Saniyede yüzlerce token üreten ultra hızlı Llama modelleri.',
       apiKeyHelpUrl: 'https://console.groq.com/keys',
+      assetLogo: 'assets/groq.png',
     ),
   ];
+
+  static String getLogoForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'gemini':
+        return 'assets/gemini.webp';
+      case 'openrouter':
+        return 'assets/oepnrouter.png';
+      case 'openai':
+        return 'assets/gpt.webp';
+      case 'deepseek':
+        return 'assets/deepseek.png';
+      case 'groq':
+        return 'assets/groq.png';
+      case 'ollama':
+      case 'custom':
+      default:
+        return 'assets/ollama.webp';
+    }
+  }
 
   static List<String> getDefaultModelsForType(String providerType) {
     final preset = presets.where((p) => p.providerType == providerType).firstOrNull;

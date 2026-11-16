@@ -353,12 +353,20 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 36,
+                          height: 36,
+                          padding: const EdgeInsets.all(5),
                           decoration: BoxDecoration(
                             color: AppColors.accent.withAlpha(25),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
+                          child: activeProvider != null
+                              ? Image.asset(
+                                  activeProvider.assetLogo,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
+                                )
+                              : Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -679,12 +687,18 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 36,
+                    height: 36,
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withAlpha(25),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.psychology_rounded, color: AppColors.accent, size: 20),
+                    child: Image.asset(
+                      activeProvider.assetLogo,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(Icons.psychology_rounded, color: AppColors.accent, size: 20),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

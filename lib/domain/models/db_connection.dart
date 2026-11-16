@@ -11,6 +11,15 @@ enum DbType {
     }
   }
 
+  String get assetLogo {
+    switch (this) {
+      case DbType.postgresql:
+        return 'assets/postgre.png';
+      case DbType.mysql:
+        return 'assets/mysql.png';
+    }
+  }
+
   String get storageKey => name;
 
   int get defaultPort {
