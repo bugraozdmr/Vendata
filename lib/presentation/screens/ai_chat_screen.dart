@@ -5,8 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/models/ai_chat_model.dart';
+import '../../domain/models/db_connection.dart';
 import '../../domain/models/query_result.dart';
 import '../providers/ai_provider.dart';
+import '../providers/connection_provider.dart';
 import '../providers/database_provider.dart';
 import '../widgets/data_grid_table.dart';
 import '../widgets/interactive_chart.dart';
@@ -14,8 +16,9 @@ import 'ai_settings_screen.dart';
 
 class AiChatScreen extends ConsumerStatefulWidget {
   final void Function(String sql, String? tableName)? onNavigateToSql;
+  final VoidCallback? onBackToHome;
 
-  const AiChatScreen({super.key, this.onNavigateToSql});
+  const AiChatScreen({super.key, this.onNavigateToSql, this.onBackToHome});
 
   @override
   ConsumerState<AiChatScreen> createState() => _AiChatScreenState();
@@ -62,6 +65,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     final chatState = ref.watch(aiChatProvider);
     final activeAi = ref.watch(activeAiProvider);
     final tablesState = ref.watch(tablesProvider);
+    final connState = ref.watch(connectionsProvider);
+    final activeConn = connState.activeConnection;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     ref.listen(aiChatProvider.select((s) => s.messages.length), (prev, next) {
@@ -78,7 +83,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         child: Column(
           children: [
             // Top Bar
-            _buildTopBar(context, chatState, activeAi, availableTables),
+            _buildTopBar(context, chatState, activeAi, availableTables, activeConn),
 
             // Message List or Empty Suggestions
             Expanded(
@@ -116,9 +121,12 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     AiChatState chatState,
     dynamic activeAi,
     List<dynamic> availableTables,
+    DbConnection? activeConn,
   ) {
     final activeConv = chatState.activeConversation;
     final title = activeConv?.title ?? 'AI Sohbet';
+    final isRemote = activeConn != null;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
@@ -130,6 +138,16 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         children: [
           Row(
             children: [
+              if (!isLandscape) ...[
+                IconButton(
+                  tooltip: 'Tablolara Dön',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                  icon: Icon(Icons.arrow_back_rounded, size: 22, color: AppColors.textPrimary),
+                  onPressed: widget.onBackToHome ?? () => Navigator.maybePop(context),
+                ),
+                const SizedBox(width: 4),
+              ],
               // Active AI Brand Logo or Sparkle
               Container(
                 width: 38,
@@ -167,6 +185,10 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                           ),
                         ),
                       ),
+                      if (activeConv?.isPinned == true) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.push_pin_rounded, size: 14, color: AppColors.accent),
+                      ],
                       const SizedBox(width: 4),
                       Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textSecondary),
                     ],
@@ -184,7 +206,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(
                     color: AppColors.cardMuted,
                     borderRadius: BorderRadius.circular(12),
@@ -212,7 +234,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
                       ] else ...[
                         Container(
                           width: 7,
@@ -222,14 +244,19 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
                       ],
-                      Text(
-                        activeAi != null ? activeAi.modelName : 'Model Yok',
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 80),
+                        child: Text(
+                          activeAi != null ? activeAi.modelName : 'Model Yok',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ],
@@ -250,14 +277,69 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Table filter selector row
+          // Source and Table filter selector row
           Row(
             children: [
-              Text(
-                'Hedef Tablo:',
-                style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+              // Data source button (Local vs Server)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _showSourcePickerSheet(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isRemote ? AppColors.accentLight : AppColors.cardMuted,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isRemote ? AppColors.accent.withAlpha(80) : AppColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isRemote) ...[
+                        Image.asset(
+                          activeConn.type.assetLogo,
+                          width: 14,
+                          height: 14,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Icon(Icons.dns_rounded, size: 14, color: AppColors.accent),
+                        ),
+                        const SizedBox(width: 4),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 80),
+                          child: Text(
+                            activeConn.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Icon(Icons.folder_open_rounded, size: 14, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Yerel',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 2),
+                      Icon(Icons.arrow_drop_down_rounded, size: 16, color: isRemote ? AppColors.accent : AppColors.textMuted),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
+
+              // Table filter chips
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -319,17 +401,17 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   }
 
   Widget _buildEmptyState(List<dynamic> tables, String? selectedTable, dynamic activeAi) {
-    final tableName = selectedTable ?? (tables.isNotEmpty ? tables.first.name : null);
+    final hasTable = selectedTable != null;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Container(
-            width: 64,
-            height: 64,
+            width: 60,
+            height: 60,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.accentLight,
@@ -339,22 +421,24 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 ? Image.asset(
                     activeAi.assetLogo,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 30),
+                    errorBuilder: (context, error, stackTrace) => Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 28),
                   )
-                : Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 30),
+                : Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 28),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Text(
             'Verilerinize Soru Sorun',
             style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            'Yapay zeka verilerinizi analiz eder, SQL sorgusunu üretir ve grafik veya tablo olarak anında görselleştirir.',
+            hasTable
+                ? '"$selectedTable" tablosu aktif. Sütunları açıklayabilir, özet çıkartabilir veya grafik çizdirebilirsiniz.'
+                : 'Yapay zeka verilerinizi analiz eder, SQL sorgusunu üretir ve grafik veya tablo olarak anında görselleştirir.',
             textAlign: TextAlign.center,
             style: GoogleFonts.dmSans(fontSize: 13, height: 1.4, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           Align(
             alignment: Alignment.centerLeft,
@@ -369,14 +453,16 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (tableName != null) ...[
-                _buildPromptChip('En çok satış/değer yapılan ilk 5 kayıt hangisi?'),
-                _buildPromptChip('Kategorilere göre dağılım grafiği oluştur.'),
-                _buildPromptChip('Toplam ve ortalama değerleri özetle.'),
-                _buildPromptChip('Eksik veya null olan satırları bul.'),
+              if (hasTable) ...[
+                _buildPromptChip('📌 "$selectedTable" sütunlarını ve veri tiplerini açıkla'),
+                _buildPromptChip('📊 "$selectedTable" tablosundaki ilk 5 kaydı ve özet verileri getir'),
+                _buildPromptChip('🔍 Eksik veya null olan satırları bul'),
+                _buildPromptChip('📈 Sayısal sütunların ortalamasını ve dağılımını göster'),
               ] else ...[
-                _buildPromptChip('Hangi veritabanı tabloları mevcut?'),
-                _buildPromptChip('En büyük tablodaki kayıt sayısı kaç?'),
+                _buildPromptChip('🗄️ Veritabanındaki tüm tabloları ve şemayı özetle'),
+                _buildPromptChip('📋 Tablolarda kaçar adet kayıt var listele'),
+                _buildPromptChip('🔗 Tablolar arasındaki olası ilişkileri ve anahtarları göster'),
+                _buildPromptChip('⚡ En çok veri içeren tabloları listele'),
               ],
             ],
           ),
@@ -443,74 +529,74 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   }
 
   Widget _buildInputBar(bool isLandscape) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final isKeyboardOpen = bottomInset > 0;
-    final bottomPad = isLandscape
-        ? (isKeyboardOpen ? (bottomInset + 8.0) : 12.0)
-        : (isKeyboardOpen ? (bottomInset + 8.0) : 76.0);
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border.withAlpha(50))),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(6),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.cardMuted,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: TextField(
-                controller: _textController,
-                focusNode: _focusNode,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendMessage(),
-                style: GoogleFonts.dmSans(fontSize: 14, color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Verinize bir soru sorun...',
-                  hintStyle: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+    return SafeArea(
+      top: false,
+      left: false,
+      right: false,
+      bottom: true,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, isLandscape ? 8.0 : 8.0),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border.withAlpha(50))),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(6),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.cardMuted,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: TextField(
+                  controller: _textController,
+                  focusNode: _focusNode,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendMessage(),
+                  style: GoogleFonts.dmSans(fontSize: 14, color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Verinize bir soru sorun...',
+                    hintStyle: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textMuted),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _sendMessage(),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(color: AppColors.accent.withAlpha(50), blurRadius: 8, offset: const Offset(0, 2)),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.arrow_upward_rounded, size: 22, color: Colors.white),
+            const SizedBox(width: 8),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _sendMessage(),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: AppColors.accent.withAlpha(50), blurRadius: 8, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(Icons.arrow_upward_rounded, size: 22, color: Colors.white),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -522,96 +608,412 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
-        final convs = chatState.conversations;
         final dateFormat = DateFormat('dd.MM.yyyy HH:mm');
 
-        return Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Consumer(
+          builder: (context, ref, _) {
+            final liveState = ref.watch(aiChatProvider);
+            final convs = liveState.conversations;
+
+            return Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Kayıtlı Sohbetler',
-                    style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Kayıtlı Sohbetler',
+                        style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close_rounded, color: AppColors.textMuted),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: Icon(Icons.close_rounded, color: AppColors.textMuted),
-                    onPressed: () => Navigator.pop(ctx),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      minimumSize: const Size(double.infinity, 44),
+                    ),
+                    icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                    label: Text('Yeni Sohbet Başlat', style: GoogleFonts.dmSans(fontWeight: FontWeight.w700, color: Colors.white)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ref.read(aiChatProvider.notifier).newConversation();
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  Expanded(
+                    child: convs.isEmpty
+                        ? Center(
+                            child: Text('Kayıtlı sohbet bulunamadı.', style: GoogleFonts.dmSans(color: AppColors.textMuted)),
+                          )
+                        : ListView.separated(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: convs.length,
+                            separatorBuilder: (_, index) => const SizedBox(height: 8),
+                            itemBuilder: (context, idx) {
+                              final c = convs[idx];
+                              final isSelected = c.id == liveState.activeConversation?.id;
+
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.accentLight : AppColors.cardMuted,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.fromLTRB(14, 2, 8, 2),
+                                  title: Row(
+                                    children: [
+                                      if (c.isPinned) ...[
+                                        Icon(Icons.push_pin_rounded, size: 14, color: AppColors.accent),
+                                        const SizedBox(width: 5),
+                                      ],
+                                      Expanded(
+                                        child: Text(
+                                          c.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.spaceGrotesk(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: isSelected ? AppColors.accent : AppColors.textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Text(
+                                    '${dateFormat.format(c.updatedAt)} · ${c.messageCount} mesaj',
+                                    style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Pin Button
+                                      IconButton(
+                                        tooltip: c.isPinned ? 'Sabitlemeyi Kaldır' : 'Başa Sabitle',
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        padding: EdgeInsets.zero,
+                                        icon: Icon(
+                                          c.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                                          size: 18,
+                                          color: c.isPinned ? AppColors.accent : AppColors.textMuted,
+                                        ),
+                                        onPressed: () {
+                                          ref.read(aiChatProvider.notifier).togglePin(c.id);
+                                        },
+                                      ),
+                                      // Rename Button
+                                      IconButton(
+                                        tooltip: 'İsim Değiştir',
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        padding: EdgeInsets.zero,
+                                        icon: Icon(Icons.edit_outlined, size: 18, color: AppColors.textMuted),
+                                        onPressed: () {
+                                          _showRenameDialog(context, c);
+                                        },
+                                      ),
+                                      // Delete Button
+                                      IconButton(
+                                        tooltip: 'Sohbeti Sil',
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        padding: EdgeInsets.zero,
+                                        icon: Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                                        onPressed: () {
+                                          ref.read(aiChatProvider.notifier).deleteConversation(c.id);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    ref.read(aiChatProvider.notifier).selectConversation(c.id);
+                                    Navigator.pop(ctx);
+                                  },
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  minimumSize: const Size(double.infinity, 44),
-                ),
-                icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                label: Text('Yeni Sohbet Başlat', style: GoogleFonts.dmSans(fontWeight: FontWeight.w700, color: Colors.white)),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ref.read(aiChatProvider.notifier).newConversation();
-                },
-              ),
-              const SizedBox(height: 14),
-              Expanded(
-                child: convs.isEmpty
-                    ? Center(
-                        child: Text('Kayıtlı sohbet bulunamadı.', style: GoogleFonts.dmSans(color: AppColors.textMuted)),
-                      )
-                    : ListView.separated(
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: convs.length,
-                        separatorBuilder: (_, index) => const SizedBox(height: 8),
-                        itemBuilder: (context, idx) {
-                          final c = convs[idx];
-                          final isSelected = c.id == chatState.activeConversation?.id;
+            );
+          },
+        );
+      },
+    );
+  }
 
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.accentLight : AppColors.cardMuted,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                              title: Text(
-                                c.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+  void _showRenameDialog(BuildContext context, AiConversation conv) {
+    final controller = TextEditingController(text: conv.title);
+    showDialog(
+      context: context,
+      builder: (dlgCtx) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'Sohbeti Yeniden Adlandır',
+            style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Sohbet başlığı...',
+              hintStyle: GoogleFonts.dmSans(color: AppColors.textMuted),
+              filled: true,
+              fillColor: AppColors.cardMuted,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.accent, width: 1.5),
+              ),
+            ),
+            style: GoogleFonts.dmSans(fontSize: 14, color: AppColors.textPrimary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dlgCtx),
+              child: Text('İptal', style: GoogleFonts.dmSans(color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  ref.read(aiChatProvider.notifier).renameConversation(conv.id, text);
+                }
+                Navigator.pop(dlgCtx);
+              },
+              child: Text('Kaydet', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSourcePickerSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final connState = ref.watch(connectionsProvider);
+            final activeConn = connState.activeConnection;
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(40),
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 8),
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentLight,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.storage_rounded, size: 20, color: AppColors.accent),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Veri Kaynağı Seçin',
                                 style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 14,
+                                  fontSize: 17,
                                   fontWeight: FontWeight.w700,
-                                  color: isSelected ? AppColors.accent : AppColors.textPrimary,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
-                              subtitle: Text(
-                                '${dateFormat.format(c.updatedAt)} · ${c.messageCount} mesaj',
-                                style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                              Text(
+                                'Yapay zekanın sorgulayacağı veritabanı veya dosyayı belirleyin',
+                                style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
                               ),
-                              trailing: IconButton(
-                                icon: Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                                onPressed: () {
-                                  ref.read(aiChatProvider.notifier).deleteConversation(c.id);
-                                  Navigator.pop(ctx);
-                                },
-                              ),
-                              onTap: () {
-                                ref.read(aiChatProvider.notifier).selectConversation(c.id);
-                                Navigator.pop(ctx);
-                              },
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        // Option 1: Local SQLite / Imported Files
+                        ListTile(
+                          leading: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: AppColors.cardMuted,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.border),
                             ),
-                          );
-                        },
-                      ),
+                            child: Icon(Icons.folder_open_rounded, size: 20, color: AppColors.textPrimary),
+                          ),
+                          title: Text(
+                            'Yerel Veritabanı (CSV / Excel)',
+                            style: GoogleFonts.dmSans(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Cihazdaki yerel tablolar ve içe aktarılan dosyalar',
+                            style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+                          ),
+                          trailing: activeConn == null
+                              ? Icon(Icons.check_circle_rounded, color: AppColors.accent, size: 22)
+                              : null,
+                          onTap: () {
+                            if (activeConn != null) {
+                              ref.read(connectionsProvider.notifier).disconnect();
+                              ref.read(aiChatProvider.notifier).setSelectedTable(null);
+                            }
+                            Navigator.pop(ctx);
+                          },
+                        ),
+
+                        if (connState.connections.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                            child: Text(
+                              'KAYITLI UZAK SUNUCULAR',
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                          ...connState.connections.map((conn) {
+                            final isSelected = activeConn?.id == conn.id;
+                            final health = connState.healthFor(conn.id);
+
+                            return ListTile(
+                              leading: Container(
+                                width: 38,
+                                height: 38,
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.cardMuted,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Image.asset(
+                                  conn.type.assetLogo,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(Icons.dns_rounded, size: 20, color: AppColors.accent),
+                                ),
+                              ),
+                              title: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      conn.name,
+                                      style: GoogleFonts.dmSans(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: health.isOnline
+                                          ? AppColors.success
+                                          : (health.isOffline ? AppColors.error : AppColors.textMuted),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                '${conn.type.label} • ${conn.database} (${conn.host})',
+                                style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+                              ),
+                              trailing: isSelected
+                                  ? Icon(Icons.check_circle_rounded, color: AppColors.accent, size: 22)
+                                  : null,
+                              onTap: () async {
+                                if (!isSelected) {
+                                  await ref.read(connectionsProvider.notifier).connect(conn);
+                                  ref.read(aiChatProvider.notifier).setSelectedTable(null);
+                                }
+                                if (ctx.mounted) Navigator.pop(ctx);
+                              },
+                            );
+                          }),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

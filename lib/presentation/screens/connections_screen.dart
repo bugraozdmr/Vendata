@@ -87,7 +87,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.spaceGrotesk(
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                       letterSpacing: -0.8,
@@ -104,15 +104,15 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                       child: Tooltip(
                         message: 'Bağlantı durumlarını yenile',
                         child: Container(
-                          height: 42,
-                          width: 42,
+                          height: 40,
+                          width: 40,
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
                             color: AppColors.surface,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: AppColors.border),
                           ),
-                          child: Icon(Icons.refresh_rounded, size: 20, color: AppColors.textSecondary),
+                          child: Icon(Icons.refresh_rounded, size: 19, color: AppColors.textSecondary),
                         ),
                       ),
                     ),
@@ -120,8 +120,8 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                       behavior: HitTestBehavior.opaque,
                       onTap: state.isConnecting ? null : () => _openForm(),
                       child: Container(
-                        height: 42,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        height: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
                           color: state.isConnecting ? AppColors.textMuted : AppColors.accent,
                           borderRadius: BorderRadius.circular(14),
@@ -140,15 +140,15 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                           children: [
                             if (state.isConnecting)
                               const SizedBox(
-                                width: 18,
-                                height: 18,
+                                width: 16,
+                                height: 16,
                                 child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                               )
                             else
-                              const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                              const Icon(Icons.add_rounded, size: 18, color: Colors.white),
                             const SizedBox(width: 4),
                             Text(
-                              'Yeni Bağlantı',
+                              'Yeni',
                               style: GoogleFonts.dmSans(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,

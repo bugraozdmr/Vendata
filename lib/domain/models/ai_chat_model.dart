@@ -6,6 +6,7 @@ class AiConversation {
   final String id;
   final String title;
   final String? tableName;
+  final bool isPinned;
   final DateTime createdAt;
   final DateTime updatedAt;
   final int messageCount;
@@ -14,6 +15,7 @@ class AiConversation {
     required this.id,
     required this.title,
     this.tableName,
+    this.isPinned = false,
     required this.createdAt,
     required this.updatedAt,
     this.messageCount = 0,
@@ -23,6 +25,7 @@ class AiConversation {
     String? id,
     String? title,
     String? tableName,
+    bool? isPinned,
     DateTime? createdAt,
     DateTime? updatedAt,
     int? messageCount,
@@ -31,6 +34,7 @@ class AiConversation {
       id: id ?? this.id,
       title: title ?? this.title,
       tableName: tableName ?? this.tableName,
+      isPinned: isPinned ?? this.isPinned,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       messageCount: messageCount ?? this.messageCount,
@@ -41,6 +45,7 @@ class AiConversation {
         'id': id,
         'title': title,
         'table_name': tableName,
+        'is_pinned': isPinned ? 1 : 0,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -50,6 +55,7 @@ class AiConversation {
       id: map['id'] as String,
       title: map['title'] as String? ?? 'Yeni Sohbet',
       tableName: map['table_name'] as String?,
+      isPinned: (map['is_pinned'] as int? ?? 0) == 1,
       createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime.now(),
       messageCount: messageCount,

@@ -175,6 +175,26 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
     }
   }
 
+  void renameConversation(String id, String newTitle) {
+    final trimmed = newTitle.trim();
+    if (trimmed.isEmpty) return;
+    _engine.updateAiConversationTitle(id, trimmed);
+    final list = _engine.getAiConversations();
+    final updatedActive = (state.activeConversation?.id == id)
+        ? state.activeConversation!.copyWith(title: trimmed)
+        : state.activeConversation;
+    state = state.copyWith(conversations: list, activeConversation: updatedActive);
+  }
+
+  void togglePin(String id) {
+    _engine.toggleAiConversationPin(id);
+    final list = _engine.getAiConversations();
+    final updatedActive = (state.activeConversation?.id == id)
+        ? list.where((c) => c.id == id).firstOrNull ?? state.activeConversation
+        : state.activeConversation;
+    state = state.copyWith(conversations: list, activeConversation: updatedActive);
+  }
+
   void deleteConversation(String id) {
     _engine.deleteAiConversation(id);
     final list = _engine.getAiConversations();
@@ -254,12 +274,18 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
     final tablesState = _ref.read(tablesProvider);
     final session = _ref.read(sessionProvider);
     final dialect = session.dialect;
+    final connState = _ref.read(connectionsProvider);
+    final isRemote = connState.activeConnection != null;
+    final sourceDesc = isRemote
+        ? 'Uzak Veritabanı Sunucusu: ${connState.activeConnection!.name} (${connState.activeConnection!.type.label}) - Veritabanı: ${connState.activeConnection!.database}'
+        : 'Yerel Veritabanı (İçe aktarılan CSV / Excel dosyaları ve yerel tablolar)';
 
     try {
       final intent = await _aiService.generateQueryIntent(
         question: trimmed,
         tables: tablesState.tables,
         activeTableName: state.selectedTable,
+        dataSourceDescription: sourceDesc,
         previousMessages: state.messages,
         dialect: dialect,
         provider: provider,

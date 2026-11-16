@@ -122,17 +122,21 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
     final currentSql = _query.toSql();
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Sub-navigation pills (wrap so JOIN is always visible)
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildSubNavPill(0, 'Sütun & Filtre', Icons.filter_list_rounded),
-            _buildSubNavPill(1, 'Grupla & Özet', Icons.pie_chart_rounded),
-            _buildSubNavPill(2, 'Hesapla', Icons.functions_rounded),
-            _buildSubNavPill(3, 'JOIN', Icons.alt_route_rounded),
-          ],
+        // Sub-navigation pills (wrap aligned to left so it matches the rest of the UI)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildSubNavPill(0, 'Sütun & Filtre', Icons.filter_list_rounded),
+              _buildSubNavPill(1, 'Grupla & Özet', Icons.pie_chart_rounded),
+              _buildSubNavPill(2, 'Hesapla', Icons.functions_rounded),
+              _buildSubNavPill(3, 'JOIN', Icons.alt_route_rounded),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
 

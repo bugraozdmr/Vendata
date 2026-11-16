@@ -68,7 +68,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _pickFile());
         break;
       case 'action_connections':
-        setState(() => _currentIndex = 2);
+        setState(() => _currentIndex = 3);
         break;
     }
   }
@@ -110,13 +110,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final pages = [
       TablesScreen(onNavigateToSql: _navigateToQuery),
       SqlScreen(targetTable: _selectedTableForQuery),
-      AiChatScreen(onNavigateToSql: (sql, tableName) {
-        if (tableName != null) {
-          _selectedTableForQuery = tableName;
-        }
-        ref.read(queryProvider.notifier).setSql(sql);
-        setState(() => _currentIndex = 1);
-      }),
+      AiChatScreen(
+        onBackToHome: () => setState(() => _currentIndex = 0),
+        onNavigateToSql: (sql, tableName) {
+          if (tableName != null) {
+            _selectedTableForQuery = tableName;
+          }
+          ref.read(queryProvider.notifier).setSql(sql);
+          setState(() => _currentIndex = 1);
+        },
+      ),
       ConnectionsScreen(onConnected: () => setState(() => _currentIndex = 0)),
       SettingsScreen(onOpenQuery: _openQueryFromHistory),
     ];
@@ -141,26 +144,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    final isChatTab = _currentIndex == 2;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: pages,
-            ),
-          ),
-          if (!keyboardVisible)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 8,
-              child: _buildFloatingBottomNav(context),
-            ),
-        ],
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        resizeToAvoidBottomInset: true,
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: (isLandscape || keyboardVisible || isChatTab)
+            ? null
+            : _buildFloatingBottomNav(context),
       ),
     );
   }
@@ -279,19 +281,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       left: false,
       right: false,
       bottom: true,
-      minimum: const EdgeInsets.only(bottom: 12),
+      minimum: const EdgeInsets.only(bottom: 8),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 28),
-        height: 58,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        margin: const EdgeInsets.fromLTRB(24, 4, 24, 6),
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: AppColors.primary,
-          borderRadius: BorderRadius.circular(29),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(45),
-              blurRadius: 18,
-              offset: const Offset(0, 5),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
         ),

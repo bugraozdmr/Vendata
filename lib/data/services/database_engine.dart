@@ -104,10 +104,15 @@ class DatabaseEngine {
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         table_name TEXT,
+        is_pinned INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
     ''');
+
+    try {
+      _db.execute('ALTER TABLE _vendata_ai_conversations ADD COLUMN is_pinned INTEGER DEFAULT 0;');
+    } catch (_) {}
 
     _db.execute('''
       CREATE TABLE IF NOT EXISTS _vendata_ai_messages (
@@ -770,7 +775,16 @@ class DatabaseEngine {
   void _seedInitialAiProviders() {
     try {
       final existing = _db.select('SELECT id FROM _vendata_ai_providers LIMIT 1;');
-      if (existing.isNotEmpty) return;
+      if (existing.isNotEmpty) {
+        // Upgrade any outdated/deprecated Gemini models to working gemini-3.5-flash-lite
+        _db.execute('''
+          UPDATE _vendata_ai_providers 
+          SET model_name = 'gemini-3.5-flash-lite'
+          WHERE provider_type = 'gemini' 
+            AND (model_name LIKE '%2.0-flash%' OR model_name LIKE '%1.5-flash%' OR model_name LIKE '%2.5-flash%');
+        ''');
+        return;
+      }
 
       final geminiKey = AppConfig.geminiApiKey;
       final openRouterKey = AppConfig.openRouterApiKey;
@@ -879,7 +893,7 @@ class DatabaseEngine {
         FROM _vendata_ai_conversations c
         LEFT JOIN _vendata_ai_messages m ON c.id = m.conversation_id
         GROUP BY c.id
-        ORDER BY c.updated_at DESC;
+        ORDER BY c.is_pinned DESC, c.updated_at DESC;
       ''');
       return res.map((r) {
         final map = Map<String, dynamic>.from(r);
@@ -895,17 +909,19 @@ class DatabaseEngine {
     try {
       _db.execute(
         '''
-        INSERT INTO _vendata_ai_conversations (id, title, table_name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO _vendata_ai_conversations (id, title, table_name, is_pinned, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           title = excluded.title,
           table_name = excluded.table_name,
+          is_pinned = excluded.is_pinned,
           updated_at = excluded.updated_at;
         ''',
         [
           conv.id,
           conv.title,
           conv.tableName,
+          conv.isPinned ? 1 : 0,
           conv.createdAt.toIso8601String(),
           conv.updatedAt.toIso8601String(),
         ],
@@ -918,6 +934,15 @@ class DatabaseEngine {
       _db.execute(
         'UPDATE _vendata_ai_conversations SET title = ?, updated_at = ? WHERE id = ?;',
         [title, DateTime.now().toIso8601String(), id],
+      );
+    } catch (_) {}
+  }
+
+  void toggleAiConversationPin(String id) {
+    try {
+      _db.execute(
+        'UPDATE _vendata_ai_conversations SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END WHERE id = ?;',
+        [id],
       );
     } catch (_) {}
   }

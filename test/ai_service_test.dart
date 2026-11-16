@@ -112,6 +112,16 @@ void main() {
       final reconstructed = AiConversation.fromMap(map);
       expect(reconstructed.id, conv.id);
       expect(reconstructed.title, conv.title);
+      expect(reconstructed.isPinned, false);
+
+      final pinned = conv.copyWith(isPinned: true, title: 'Önemli Satışlar');
+      expect(pinned.isPinned, true);
+      expect(pinned.title, 'Önemli Satışlar');
+      final pinnedMap = pinned.toMap();
+      expect(pinnedMap['is_pinned'], 1);
+      final reconstructedPinned = AiConversation.fromMap(pinnedMap);
+      expect(reconstructedPinned.isPinned, true);
+      expect(reconstructedPinned.title, 'Önemli Satışlar');
     });
   });
 }

@@ -14,6 +14,7 @@ class AIService {
     required String question,
     required List<TableSchema> tables,
     String? activeTableName,
+    String? dataSourceDescription,
     List<AiMessage> previousMessages = const [],
     required DbDialect dialect,
     required AIProviderModel provider,
@@ -21,10 +22,13 @@ class AIService {
     final schemaDescription = _formatSchemaDescription(tables, activeTableName);
     final historyContext = _formatHistoryContext(previousMessages);
     final dialectName = dialect.label;
+    final sourceInfo = dataSourceDescription ?? (activeTableName != null ? 'Tablo: $activeTableName' : 'Tüm Tablolar');
 
     final systemPrompt = '''
 You are Vendata AI, an expert SQL data analyst assistant.
-Convert the user's natural language question into an executable $dialectName query and visual intent based strictly on the provided schema.
+Data Source: $sourceInfo
+Active Scope: ${activeTableName != null ? 'Table "$activeTableName"' : 'All Tables'}
+Convert the user's natural language question into an executable $dialectName query, chart visual, or clear Turkish explanation based strictly on the provided schema.
 
 Available Database Schema:
 $schemaDescription
@@ -36,7 +40,7 @@ Output Rules:
 1. Output ONLY a valid JSON object. No Markdown code fences, no extra text.
 2. Structure:
 {
-  "sql": "SELECT ...;",
+  "sql": "SELECT ...;" or null,
   "intent": "chart" | "table" | "scalar" | "text",
   "chartType": "bar" | "pie" | "line" | null,
   "chartX": "category_column_name_or_null",
@@ -47,7 +51,9 @@ Output Rules:
 - If user asks for a chart/distribution (grafik, pasta, çizgi, sütun), set intent="chart", chartType="bar"|"pie"|"line", and choose appropriate X and Y columns.
 - If user asks for a single person/top metric (en çok, en az, toplam kaç), set intent="scalar".
 - If user asks for general data listing, set intent="table".
+- If user asks to explain columns, tables, or what the data means (e.g. "sütunları açıkla", "bu veriler ne", "tabloyu anlat", "şema nedir"), set sql=null, intent="text", and explain the columns and data clearly in Turkish bullet points in "explanation".
 - If question is conversational without data query, set sql=null, intent="text", explanation="Türkçe yanıt".
+- When an active table is selected, focus queries and explanations exclusively on that table unless the user explicitly requests another.
 - Always write valid, safe $dialectName queries. Never write DROP, DELETE, or ALTER. Limit unconstrained queries to 50 rows.
 ''';
 
@@ -57,7 +63,7 @@ Output Rules:
       systemPrompt: systemPrompt,
       userPrompt: userPrompt,
       provider: provider,
-      maxTokens: 500,
+      maxTokens: 800,
     );
 
     return _parseIntentFromJson(rawContent);
@@ -175,33 +181,46 @@ Keep the explanation under 4 sentences.
     required AIProviderModel provider,
     required int maxTokens,
   }) async {
-    final modelName = provider.modelName.isNotEmpty ? provider.modelName : 'gemini-1.5-flash';
+    var modelName = provider.modelName.trim();
+    if (modelName.isEmpty ||
+        modelName.contains('2.0-flash') ||
+        modelName.contains('1.5-flash') ||
+        modelName.contains('2.5-flash')) {
+      modelName = 'gemini-3.5-flash-lite';
+    }
+
     final apiKey = provider.apiKey.trim();
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
-    );
 
-    final payload = {
-      'contents': [
-        {
-          'parts': [
-            {'text': '$systemPrompt\n\nUser Question:\n$userPrompt'}
-          ]
+    Future<http.Response> requestModel(String model) {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
+      );
+      final payload = {
+        'contents': [
+          {
+            'parts': [
+              {'text': '$systemPrompt\n\nUser Question:\n$userPrompt'}
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.2,
+          'maxOutputTokens': maxTokens,
         }
-      ],
-      'generationConfig': {
-        'temperature': 0.2,
-        'maxOutputTokens': maxTokens,
-      }
-    };
+      };
+      return http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 30));
+    }
 
-    final response = await http
-        .post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(payload),
-        )
-        .timeout(const Duration(seconds: 30));
+    var response = await requestModel(modelName);
+
+    // If requested model was retired (404) or overloaded (503), automatically fallback to gemini-3.5-flash-lite
+    if ((response.statusCode == 404 || response.statusCode == 503) && modelName != 'gemini-3.5-flash-lite') {
+      response = await requestModel('gemini-3.5-flash-lite');
+    }
 
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
@@ -329,8 +348,27 @@ Keep the explanation under 4 sentences.
         explanation: explanation.isNotEmpty ? explanation : 'Sorgu oluşturuldu.',
       );
     } catch (_) {
-      // Fallback: If not valid JSON, check if it contains SELECT
-      if (cleaned.toUpperCase().contains('SELECT ')) {
+      // Fallback 1: Extract "sql" and "explanation" using regex if JSON was truncated
+      final sqlMatch = RegExp(r'"sql"\s*:\s*"((?:\\.|[^"\\])*)"').firstMatch(cleaned);
+      final explMatch = RegExp(r'"explanation"\s*:\s*"((?:\\.|[^"\\])*)"?').firstMatch(cleaned);
+      final intentMatch = RegExp(r'"intent"\s*:\s*"([a-zA-Z]+)"').firstMatch(cleaned);
+
+      if (sqlMatch != null) {
+        var sql = sqlMatch.group(1) ?? '';
+        sql = sql.replaceAll(r'\"', '"').replaceAll(r'\n', '\n').trim();
+        var explanation = explMatch?.group(1)?.replaceAll(r'\"', '"').trim() ?? 'SQL sorgusu oluşturuldu.';
+        final intent = intentMatch?.group(1) ?? 'table';
+
+        return AiQueryIntent(
+          sql: _cleanSqlOutput(sql),
+          intent: intent,
+          explanation: explanation,
+        );
+      }
+
+      // Fallback 2: Check if raw text starts with SELECT/WITH (clean SQL only, never JSON)
+      final upper = cleaned.toUpperCase();
+      if (!cleaned.contains('{') && (upper.startsWith('SELECT ') || upper.startsWith('WITH '))) {
         final extractedSql = _cleanSqlOutput(cleaned);
         return AiQueryIntent(
           sql: extractedSql,
@@ -338,6 +376,7 @@ Keep the explanation under 4 sentences.
           explanation: 'SQL sorgusu oluşturuldu.',
         );
       }
+
       return AiQueryIntent(
         sql: null,
         intent: 'text',
