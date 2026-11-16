@@ -1,8 +1,11 @@
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/export_helper.dart';
+import '../../data/services/db_session.dart';
 import '../../domain/models/chart_config.dart';
 import '../../domain/models/query_result.dart';
 import '../../domain/models/visual_query.dart';
@@ -250,6 +253,85 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           tab.title = target;
         }
       });
+    }
+  }
+
+  Future<void> _copyToClipboard(String text, String message) async {
+    if (text.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.dmSans()),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> _showQueryPlan(QueryTabModel tab) async {
+    final sql = tab.sqlController.text.trim();
+    if (sql.isEmpty) return;
+
+    final session = ref.read(sessionProvider);
+    final explainSql = session.dialect == DbDialect.sqlite
+        ? 'EXPLAIN QUERY PLAN $sql'
+        : 'EXPLAIN $sql';
+    final result = await session.execute(
+      explainSql,
+      tableName: tab.activeTable,
+      logQuery: false,
+    );
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          'Sorgu Planı',
+          style: GoogleFonts.spaceGrotesk(
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: SizedBox(
+          width: 720,
+          height: MediaQuery.sizeOf(context).height * 0.6,
+          child: result.hasError
+              ? Text(
+                  result.error ?? 'Sorgu planı alınamadı.',
+                  style: GoogleFonts.firaCode(fontSize: 12, color: AppColors.error),
+                )
+              : DataGridTable(result: result),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Kapat',
+              style: GoogleFonts.dmSans(fontWeight: FontWeight.w600, color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _resultAsCsv(QueryResult result) {
+    final rows = <List<dynamic>>[result.columns, ...result.rows];
+    return Csv().encode(rows);
+  }
+
+  List<String> _joinTypesFor(DbDialect dialect) {
+    switch (dialect) {
+      case DbDialect.mysql:
+        return const ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'CROSS JOIN'];
+      case DbDialect.postgresql:
+        return const ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN', 'CROSS JOIN'];
+      case DbDialect.sqlite:
+        return const ['INNER JOIN', 'LEFT JOIN', 'CROSS JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN'];
     }
   }
 
@@ -827,11 +909,13 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
     final profilerService = ref.watch(dataProfilerServiceProvider);
     final queryState = ref.watch(queryProvider);
     final currentTab = _currentTab;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final horizontalPad = isLandscape ? 12.0 : 20.0;
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+          padding: EdgeInsets.fromLTRB(horizontalPad, 6, horizontalPad, 6),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -850,13 +934,14 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
         Expanded(
           child: currentTab.queryMode == 0
               ? Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  padding: EdgeInsets.fromLTRB(horizontalPad, 4, horizontalPad, 0),
                   child: VisualQueryBuilder(
                     key: ValueKey('vqb_${currentTab.id}'),
                     tables: tablesState.tables,
                     initialTable: currentTab.activeTable,
                     initialQuery: currentTab.visualQuery ??
                         VisualQuery.tryParseSql(currentTab.sqlController.text),
+                    joinTypes: _joinTypesFor(ref.read(sessionProvider).dialect),
                     isExecuting: currentTab.isExecuting,
                     onQueryChanged: (vq) {
                       currentTab.visualQuery = vq;
@@ -879,7 +964,7 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 )
               : (currentTab.queryMode == 1
                   ? Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                      padding: EdgeInsets.fromLTRB(horizontalPad, 4, horizontalPad, 0),
                       child: DataProfilerWidget(
                         key: ValueKey('dpw_${currentTab.id}'),
                         tables: tablesState.tables,
@@ -977,21 +1062,31 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: TextField(
-                controller: tab.sqlController,
-                maxLines: null,
-                expands: true,
-                keyboardType: TextInputType.multiline,
-                style: GoogleFonts.firaCode(
-                  fontSize: 13,
-                  color: AppColors.codeText,
-                  height: 1.5,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'SQL sorgunuzu yazın...',
-                  hintStyle: GoogleFonts.firaCode(fontSize: 13, color: AppColors.textMuted),
-                  contentPadding: const EdgeInsets.all(16),
-                  border: InputBorder.none,
+              child: CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
+                    if (!tab.isExecuting) _runCurrentTabQuery();
+                  },
+                  const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+                    if (!tab.isExecuting) _runCurrentTabQuery();
+                  },
+                },
+                child: TextField(
+                  controller: tab.sqlController,
+                  maxLines: null,
+                  expands: true,
+                  keyboardType: TextInputType.multiline,
+                  style: GoogleFonts.firaCode(
+                    fontSize: 13,
+                    color: AppColors.codeText,
+                    height: 1.5,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'SQL sorgunuzu yazın... (Ctrl/⌘ + Enter ile çalıştırın)',
+                    hintStyle: GoogleFonts.firaCode(fontSize: 13, color: AppColors.textMuted),
+                    contentPadding: const EdgeInsets.all(16),
+                    border: InputBorder.none,
+                  ),
                 ),
               ),
             ),
@@ -1000,20 +1095,85 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
           Builder(
             builder: (context) {
               final currentSql = tab.sqlController.text.trim();
-              final isFavorite = queryState.savedQueries.any((q) => q.queryText.trim() == currentSql && q.isFavorite);
+              final isFavorite = queryState.favoriteQueries.contains(currentSql);
 
               return Row(
                 children: [
+                  PopupMenuButton<String>(
+                    tooltip: 'Sorgu araçları',
+                    color: AppColors.surface,
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'explain':
+                          _showQueryPlan(tab);
+                        case 'copy':
+                          _copyToClipboard(tab.sqlController.text.trim(), 'SQL panoya kopyalandı');
+                        case 'clear':
+                          setState(() => tab.sqlController.clear());
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'explain',
+                        child: Row(
+                          children: [
+                            Icon(Icons.account_tree_rounded, size: 18),
+                            SizedBox(width: 10),
+                            Text('Sorgu planını göster'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'copy',
+                        child: Row(
+                          children: [
+                            Icon(Icons.content_copy_rounded, size: 18),
+                            SizedBox(width: 10),
+                            Text('SQL\'i panoya kopyala'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'clear',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_sweep_rounded, size: 18),
+                            SizedBox(width: 10),
+                            Text('Editörü temizle'),
+                          ],
+                        ),
+                      ),
+                    ],
+                    child: Container(
+                      height: 52,
+                      width: 52,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 6, offset: const Offset(0, 2)),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(Icons.more_horiz_rounded, color: AppColors.textMuted, size: 26),
+                      ),
+                    ),
+                  ),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: currentSql.isEmpty
                         ? null
                         : () {
-                            ref.read(queryProvider.notifier).toggleFavoriteBySql(currentSql);
+                            final added = ref.read(queryProvider.notifier).toggleFavoriteBySql(
+                                  currentSql,
+                                  tableName: tab.activeTable,
+                                );
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  isFavorite ? 'Yıldız kaldırıldı' : 'Sorgu yıldızlara eklendi',
+                                  added ? 'Sorgu yıldızlara eklendi' : 'Yıldız kaldırıldı',
                                   style: GoogleFonts.dmSans(),
                                 ),
                                 duration: const Duration(seconds: 1),
@@ -1021,7 +1181,6 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                             );
-                            setState(() {});
                           },
                     child: Container(
                       height: 52,
@@ -1316,37 +1475,77 @@ class _SqlScreenState extends ConsumerState<SqlScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _isExporting
-                    ? null
-                    : () async {
-                        setState(() => _isExporting = true);
-                        try {
-                          await ExportHelper.shareAsExcel(result);
-                        } finally {
-                          if (mounted) setState(() => _isExporting = false);
-                        }
-                      },
-                child: Tooltip(
-                  message: 'Excel Olarak İndir',
-                  child: Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: AppColors.successWash,
-                      borderRadius: BorderRadius.circular(9),
+              PopupMenuButton<String>(
+                tooltip: 'Dışa Aktar',
+                color: AppColors.surface,
+                enabled: !_isExporting,
+                onSelected: (value) async {
+                  if (value == 'clipboard') {
+                    await _copyToClipboard(
+                      _resultAsCsv(result),
+                      'Sonuçlar panoya kopyalandı (CSV)',
+                    );
+                    return;
+                  }
+                  setState(() => _isExporting = true);
+                  try {
+                    if (value == 'excel') {
+                      await ExportHelper.shareAsExcel(result);
+                    } else {
+                      await ExportHelper.shareAsCsv(result);
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isExporting = false);
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'excel',
+                    child: Row(
+                      children: [
+                        Icon(Icons.grid_on_rounded, size: 18),
+                        SizedBox(width: 10),
+                        Text('Excel (.xlsx)'),
+                      ],
                     ),
-                    child: _isExporting
-                        ? SizedBox(
-                            width: 15,
-                            height: 15,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.success,
-                            ),
-                          )
-                        : Icon(Icons.download_rounded, size: 15, color: AppColors.success),
                   ),
+                  PopupMenuItem(
+                    value: 'csv',
+                    child: Row(
+                      children: [
+                        Icon(Icons.description_rounded, size: 18),
+                        SizedBox(width: 10),
+                        Text('CSV (.csv)'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'clipboard',
+                    child: Row(
+                      children: [
+                        Icon(Icons.content_copy_rounded, size: 18),
+                        SizedBox(width: 10),
+                        Text('Panoya kopyala'),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppColors.successWash,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: _isExporting
+                      ? SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.success,
+                          ),
+                        )
+                      : Icon(Icons.ios_share_rounded, size: 15, color: AppColors.success),
                 ),
               ),
             ],

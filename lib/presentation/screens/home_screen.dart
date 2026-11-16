@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:quick_actions/quick_actions.dart';
@@ -27,36 +28,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _initQuickActions();
   }
 
-  void _initQuickActions() {
+  Future<void> _initQuickActions() async {
     try {
-      _quickActions.initialize((String shortcutType) {
-        if (!mounted) return;
-        if (shortcutType == 'action_new_query') {
-          setState(() {
-            _selectedTableForQuery = null;
-            _currentIndex = 1;
-          });
-        } else if (shortcutType == 'action_upload_file') {
-          setState(() => _currentIndex = 0);
-        } else if (shortcutType == 'action_connections') {
-          setState(() => _currentIndex = 2);
-        }
-      });
-
-      _quickActions.setShortcutItems(<ShortcutItem>[
+      await _quickActions.initialize(_handleQuickAction);
+      await _quickActions.setShortcutItems(<ShortcutItem>[
         const ShortcutItem(
           type: 'action_new_query',
           localizedTitle: 'Yeni Sorgu',
+          icon: 'ic_shortcut_query',
         ),
         const ShortcutItem(
           type: 'action_upload_file',
           localizedTitle: 'Dosya Yükle',
+          icon: 'ic_shortcut_file',
         ),
         const ShortcutItem(
           type: 'action_connections',
-          localizedTitle: 'Sunucu Bağlantıları',
+          localizedTitle: 'Bağlantılar',
+          localizedSubtitle: 'Sunucu bağlantıları',
+          icon: 'ic_shortcut_server',
         ),
-      ]).catchError((_) {});
+      ]);
+    } catch (_) {}
+  }
+
+  void _handleQuickAction(String shortcutType) {
+    if (!mounted) return;
+
+    switch (shortcutType) {
+      case 'action_new_query':
+        setState(() {
+          _selectedTableForQuery = null;
+          _currentIndex = 1;
+        });
+        break;
+      case 'action_upload_file':
+        setState(() => _currentIndex = 0);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _pickFile());
+        break;
+      case 'action_connections':
+        setState(() => _currentIndex = 2);
+        break;
+    }
+  }
+
+  Future<void> _pickFile() async {
+    if (!mounted) return;
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls', 'csv', 'tsv', 'sql', 'db', 'sqlite'],
+      );
+      if (files.isEmpty || files.first.path == null) return;
+      final file = files.first;
+      await ref.read(tablesProvider.notifier).importFromFile(
+            filePath: file.path!,
+            fileName: file.name,
+          );
     } catch (_) {}
   }
 

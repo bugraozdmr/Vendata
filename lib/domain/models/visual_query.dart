@@ -104,7 +104,7 @@ class CalculatedField {
 }
 
 class JoinConfig {
-  String type; // 'LEFT JOIN', 'INNER JOIN'
+  String type; // 'LEFT JOIN', 'INNER JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN', 'CROSS JOIN'
   String table;
   String leftCol;
   String rightCol;
@@ -117,8 +117,10 @@ class JoinConfig {
   });
 
   String toSql(String primaryTable) {
-    if (table.isEmpty || leftCol.isEmpty || rightCol.isEmpty) return '';
+    if (table.isEmpty) return '';
     final joinTableEsc = SqlSanitizer.escapeIdentifier(table);
+    if (type == 'CROSS JOIN') return '$type $joinTableEsc';
+    if (leftCol.isEmpty || rightCol.isEmpty) return '';
     final leftEsc = '${SqlSanitizer.escapeIdentifier(primaryTable)}.${SqlSanitizer.escapeIdentifier(leftCol)}';
     final rightEsc = '$joinTableEsc.${SqlSanitizer.escapeIdentifier(rightCol)}';
     return '$type $joinTableEsc ON $leftEsc = $rightEsc';

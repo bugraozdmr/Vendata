@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/sql_sanitizer.dart';
 
 class QueryShortcuts extends StatelessWidget {
   final void Function(String text, bool replace) onInsert;
@@ -14,6 +15,13 @@ class QueryShortcuts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final firstTable = availableTables.isNotEmpty
+        ? SqlSanitizer.escapeIdentifier(availableTables.first)
+        : '';
+    final secondTable = availableTables.length > 1
+        ? SqlSanitizer.escapeIdentifier(availableTables[1])
+        : '';
+
     return SizedBox(
       height: 38,
       child: ListView(
@@ -23,12 +31,20 @@ class QueryShortcuts extends StatelessWidget {
           if (availableTables.isNotEmpty)
             _buildActionChip(
               label: 'SELECT *',
-              onTap: () => onInsert('SELECT * FROM ${availableTables.first} LIMIT 50;', true),
+              onTap: () => onInsert('SELECT * FROM $firstTable LIMIT 50;', true),
+            ),
+          if (availableTables.length > 1)
+            _buildActionChip(
+              label: 'JOIN',
+              onTap: () => onInsert(
+                'SELECT * FROM $firstTable\nINNER JOIN $secondTable ON $firstTable.id = $secondTable.${availableTables.first}_id\nLIMIT 50;',
+                true,
+              ),
             ),
           if (availableTables.isNotEmpty)
             _buildActionChip(
               label: 'COUNT',
-              onTap: () => onInsert('SELECT COUNT(*) AS toplam FROM ${availableTables.first};', true),
+              onTap: () => onInsert('SELECT COUNT(*) AS toplam FROM $firstTable;', true),
             ),
           _buildChip('WHERE'),
           _buildChip('ORDER BY'),

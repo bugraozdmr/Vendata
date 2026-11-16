@@ -93,19 +93,25 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     if (widget.tables.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            'Analiz edilecek tablo yok.',
-            style: GoogleFonts.dmSans(color: AppColors.textMuted, fontSize: 13),
+      return Center(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Container(
+            margin: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                'Analiz edilecek tablo yok.',
+                style: GoogleFonts.dmSans(color: AppColors.textMuted, fontSize: 13),
+              ),
+            ),
           ),
         ),
       );
@@ -113,27 +119,32 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
 
     if (_isLoading) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accent),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Tablo Analiz Ediliyor...',
-                style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Sütun tipleri ve istatistikler taranıyor',
-                style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
-              ),
-            ],
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accent),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Tablo Analiz Ediliyor...',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Sütun tipleri ve istatistikler taranıyor',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -142,84 +153,94 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
     final schema = _currentTableSchema;
 
     if (_selectedTable.isEmpty || schema == null) {
-      return Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentLight,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(Icons.analytics_rounded, size: 22, color: AppColors.accent),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Analiz Edilecek Tabloyu Seçin',
-                      style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                    ),
-                    Text(
-                      'İstatistik ve profil için bir tablo seçin',
-                      style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: widget.tables.map((table) {
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    setState(() => _selectedTable = table.name);
-                    widget.onTableChanged?.call(table.name);
-                    _loadProfile();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.only(bottom: isLandscape ? 24 : 90),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 12, offset: const Offset(0, 3)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.cardMuted,
+                      color: AppColors.accentLight,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.border),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Icon(Icons.analytics_rounded, size: 22, color: AppColors.accent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.table_rows_rounded, size: 16, color: AppColors.textPrimary),
-                        const SizedBox(width: 8),
                         Text(
-                          table.name,
-                          style: GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          'Analiz Edilecek Tabloyu Seçin',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                         ),
-                        const SizedBox(width: 6),
                         Text(
-                          '(${table.rowCount} satır)',
-                          style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                          'İstatistik ve profil için bir tablo seçin',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
                         ),
                       ],
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: widget.tables.map((table) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      setState(() => _selectedTable = table.name);
+                      widget.onTableChanged?.call(table.name);
+                      _loadProfile();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardMuted,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.table_rows_rounded, size: 16, color: AppColors.textPrimary),
+                          const SizedBox(width: 8),
+                          Text(
+                            table.name,
+                            style: GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '(${table.rowCount} satır)',
+                            style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -549,7 +570,7 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
   Widget _buildStatPill(String label, String value, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
@@ -564,9 +585,13 @@ class _DataProfilerWidgetState extends State<DataProfilerWidget> {
               style: GoogleFonts.dmSans(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w700, letterSpacing: 0.8),
             ),
             const SizedBox(height: 4),
-            Text(
-              value,
-              style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w700, color: color, letterSpacing: -0.8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w700, color: color, letterSpacing: -0.8),
+              ),
             ),
           ],
         ),

@@ -211,6 +211,7 @@ class QueryState {
   final bool isExecuting;
   final List<String> history;
   final List<SavedQuery> savedQueries;
+  final Set<String> favoriteQueries;
   final String? activeTable;
 
   const QueryState({
@@ -219,6 +220,7 @@ class QueryState {
     this.isExecuting = false,
     this.history = const [],
     this.savedQueries = const [],
+    this.favoriteQueries = const {},
     this.activeTable,
   });
 
@@ -228,6 +230,7 @@ class QueryState {
     bool? isExecuting,
     List<String>? history,
     List<SavedQuery>? savedQueries,
+    Set<String>? favoriteQueries,
     String? activeTable,
     bool clearActiveTable = false,
   }) {
@@ -237,6 +240,7 @@ class QueryState {
       isExecuting: isExecuting ?? this.isExecuting,
       history: history ?? this.history,
       savedQueries: savedQueries ?? this.savedQueries,
+      favoriteQueries: favoriteQueries ?? this.favoriteQueries,
       activeTable: clearActiveTable ? null : (activeTable ?? this.activeTable),
     );
   }
@@ -253,6 +257,7 @@ class QueryNotifier extends StateNotifier<QueryState> {
             result: QueryResult.empty(),
             history: _engine.getQueryHistory(),
             savedQueries: _engine.getSavedQueries(),
+            favoriteQueries: _engine.getFavoriteSqls(),
           ),
         );
 
@@ -261,6 +266,7 @@ class QueryNotifier extends StateNotifier<QueryState> {
       activeTable: tableName,
       clearActiveTable: tableName == null,
       savedQueries: _engine.getSavedQueries(tableName: tableName),
+      favoriteQueries: _engine.getFavoriteSqls(),
     );
   }
 
@@ -270,6 +276,7 @@ class QueryNotifier extends StateNotifier<QueryState> {
     state = state.copyWith(
       savedQueries: queries,
       history: _engine.getQueryHistory(tableName: tName),
+      favoriteQueries: _engine.getFavoriteSqls(),
     );
   }
 
@@ -278,9 +285,16 @@ class QueryNotifier extends StateNotifier<QueryState> {
     refreshSavedQueries();
   }
 
-  void toggleFavoriteBySql(String sql) {
-    _engine.toggleQueryFavoriteBySql(sql);
+  bool toggleFavoriteBySql(String sql, {String? tableName}) {
+    final trimmed = sql.trim();
+    final next = !_engine.isQueryFavorite(trimmed);
+    _engine.setQueryFavoriteBySql(
+      trimmed,
+      favorite: next,
+      tableName: tableName ?? state.activeTable,
+    );
     refreshSavedQueries();
+    return next;
   }
 
   void deleteQuery(int id) {
@@ -312,6 +326,7 @@ class QueryNotifier extends StateNotifier<QueryState> {
       isExecuting: false,
       savedQueries: updatedQueries,
       history: updatedHistory,
+      favoriteQueries: _engine.getFavoriteSqls(),
     );
 
     if (!result.hasError && result.rows.isNotEmpty) {

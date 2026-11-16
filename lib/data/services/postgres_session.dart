@@ -55,6 +55,7 @@ class PostgresSession extends DbSession {
     String sql, {
     String? tableName,
     String? sourceFile,
+    bool logQuery = true,
   }) async {
     final stopwatch = Stopwatch()..start();
     try {
@@ -70,13 +71,15 @@ class PostgresSession extends DbSession {
         }
         final rows = result.map((row) => List<dynamic>.from(row)).toList();
 
-        logger?.recordQuery(
-          sql,
-          tableName: tableName,
-          sourceFile: sourceFile,
-          executionTimeMs: stopwatch.elapsedMilliseconds,
-          rowCount: rows.length,
-        );
+        if (logQuery) {
+          logger?.recordQuery(
+            sql,
+            tableName: tableName,
+            sourceFile: sourceFile,
+            executionTimeMs: stopwatch.elapsedMilliseconds,
+            rowCount: rows.length,
+          );
+        }
 
         return QueryResult(
           columns: columns,
@@ -87,13 +90,15 @@ class PostgresSession extends DbSession {
       }
 
       final affected = result.affectedRows;
-      logger?.recordQuery(
-        sql,
-        tableName: tableName,
-        sourceFile: sourceFile,
-        executionTimeMs: stopwatch.elapsedMilliseconds,
-        rowCount: affected,
-      );
+      if (logQuery) {
+        logger?.recordQuery(
+          sql,
+          tableName: tableName,
+          sourceFile: sourceFile,
+          executionTimeMs: stopwatch.elapsedMilliseconds,
+          rowCount: affected,
+        );
+      }
 
       return QueryResult(
         columns: const ['durum', 'etkilenen_satir'],

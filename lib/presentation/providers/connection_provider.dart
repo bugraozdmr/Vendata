@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/sql_sanitizer.dart';
@@ -7,26 +10,50 @@ import '../../data/services/database_engine.dart';
 import '../../domain/models/db_connection.dart';
 import 'database_provider.dart';
 
+enum ConnectionHealthStatus { unknown, checking, online, offline }
+
+class ConnectionHealth {
+  final ConnectionHealthStatus status;
+  final DateTime? checkedAt;
+  final String? message;
+
+  const ConnectionHealth({
+    this.status = ConnectionHealthStatus.unknown,
+    this.checkedAt,
+    this.message,
+  });
+
+  bool get isOnline => status == ConnectionHealthStatus.online;
+  bool get isOffline => status == ConnectionHealthStatus.offline;
+  bool get isChecking => status == ConnectionHealthStatus.checking;
+}
+
 class ConnectionsState {
   final List<DbConnection> connections;
   final DbConnection? activeConnection;
   final bool isConnecting;
   final String? errorMessage;
+  final Map<String, ConnectionHealth> health;
 
   const ConnectionsState({
     this.connections = const [],
     this.activeConnection,
     this.isConnecting = false,
     this.errorMessage,
+    this.health = const {},
   });
 
   bool get isRemote => activeConnection != null;
+
+  ConnectionHealth healthFor(String id) =>
+      health[id] ?? const ConnectionHealth();
 
   ConnectionsState copyWith({
     List<DbConnection>? connections,
     DbConnection? activeConnection,
     bool? isConnecting,
     String? errorMessage,
+    Map<String, ConnectionHealth>? health,
     bool clearActive = false,
     bool clearError = false,
   }) {
@@ -35,18 +62,99 @@ class ConnectionsState {
       activeConnection: clearActive ? null : (activeConnection ?? this.activeConnection),
       isConnecting: isConnecting ?? this.isConnecting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      health: health ?? this.health,
     );
   }
 }
 
 class ConnectionsNotifier extends StateNotifier<ConnectionsState> {
   final DatabaseEngine _engine;
+  Timer? _healthTimer;
+  final Set<String> _checksInFlight = {};
 
-  ConnectionsNotifier(this._engine)
-      : super(ConnectionsState(connections: _engine.getConnections()));
+  /// How often saved connections are pinged in the background.
+  static const Duration healthInterval = Duration(seconds: 45);
+
+  ConnectionsNotifier(this._engine, {bool? autoHealthCheck})
+      : super(ConnectionsState(connections: _engine.getConnections())) {
+    final shouldAutoCheck = autoHealthCheck ?? (!Platform.environment.containsKey('FLUTTER_TEST'));
+    if (shouldAutoCheck) {
+      _healthTimer = Timer.periodic(healthInterval, (_) => checkAllHealth());
+      Future.microtask(checkAllHealth);
+    }
+  }
+
+  @override
+  void dispose() {
+    _healthTimer?.cancel();
+    super.dispose();
+  }
 
   void refresh() {
-    state = state.copyWith(connections: _engine.getConnections());
+    final connections = _engine.getConnections();
+    final validIds = connections.map((c) => c.id).toSet();
+    final health = Map<String, ConnectionHealth>.from(state.health)
+      ..removeWhere((id, _) => !validIds.contains(id));
+    state = state.copyWith(connections: connections, health: health);
+    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+      Future.microtask(checkAllHealth);
+    }
+  }
+
+  Future<void> checkAllHealth() async {
+    final connections = state.connections;
+    if (connections.isEmpty) return;
+    await Future.wait(connections.map(checkHealth));
+  }
+
+  Future<void> checkHealth(DbConnection connection) async {
+    if (_checksInFlight.contains(connection.id)) return;
+    _checksInFlight.add(connection.id);
+
+    _setHealth(
+      connection.id,
+      ConnectionHealth(
+        status: ConnectionHealthStatus.checking,
+        checkedAt: state.healthFor(connection.id).checkedAt,
+      ),
+    );
+
+    final previousQuote = SqlSanitizer.identifierQuote;
+    final session = createRemoteSession(connection);
+    // Creating a remote session sets the global identifier quote; restore it
+    // immediately so a background ping cannot affect query generation.
+    SqlSanitizer.setIdentifierQuote(previousQuote);
+    try {
+      await session.test();
+      _setHealth(
+        connection.id,
+        ConnectionHealth(
+          status: ConnectionHealthStatus.online,
+          checkedAt: DateTime.now(),
+        ),
+      );
+    } catch (e) {
+      _setHealth(
+        connection.id,
+        ConnectionHealth(
+          status: ConnectionHealthStatus.offline,
+          checkedAt: DateTime.now(),
+          message: _friendlyError(e),
+        ),
+      );
+    } finally {
+      await session.close();
+      SqlSanitizer.setIdentifierQuote(previousQuote);
+      _checksInFlight.remove(connection.id);
+    }
+  }
+
+  void _setHealth(String id, ConnectionHealth health) {
+    if (!mounted) return;
+    if (!state.connections.any((c) => c.id == id)) return;
+    final updated = Map<String, ConnectionHealth>.from(state.health)
+      ..[id] = health;
+    state = state.copyWith(health: updated);
   }
 
   String _newId() {
@@ -120,11 +228,27 @@ class ConnectionsNotifier extends StateNotifier<ConnectionsState> {
         activeConnection: connection,
         clearError: true,
       );
+      _setHealth(
+        connection.id,
+        ConnectionHealth(
+          status: ConnectionHealthStatus.online,
+          checkedAt: DateTime.now(),
+        ),
+      );
       return true;
     } catch (e) {
+      final message = _friendlyError(e);
       state = state.copyWith(
         isConnecting: false,
-        errorMessage: _friendlyError(e),
+        errorMessage: message,
+      );
+      _setHealth(
+        connection.id,
+        ConnectionHealth(
+          status: ConnectionHealthStatus.offline,
+          checkedAt: DateTime.now(),
+          message: message,
+        ),
       );
       return false;
     } finally {

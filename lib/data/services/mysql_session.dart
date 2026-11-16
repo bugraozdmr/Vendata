@@ -48,6 +48,7 @@ class MySqlSession extends DbSession {
     String sql, {
     String? tableName,
     String? sourceFile,
+    bool logQuery = true,
   }) async {
     final stopwatch = Stopwatch()..start();
     try {
@@ -67,13 +68,15 @@ class MySqlSession extends DbSession {
           rows.add(values);
         }
 
-        logger?.recordQuery(
-          sql,
-          tableName: tableName,
-          sourceFile: sourceFile,
-          executionTimeMs: stopwatch.elapsedMilliseconds,
-          rowCount: rows.length,
-        );
+        if (logQuery) {
+          logger?.recordQuery(
+            sql,
+            tableName: tableName,
+            sourceFile: sourceFile,
+            executionTimeMs: stopwatch.elapsedMilliseconds,
+            rowCount: rows.length,
+          );
+        }
 
         return QueryResult(
           columns: columns,
@@ -84,13 +87,15 @@ class MySqlSession extends DbSession {
       }
 
       final affected = result.affectedRows.toInt();
-      logger?.recordQuery(
-        sql,
-        tableName: tableName,
-        sourceFile: sourceFile,
-        executionTimeMs: stopwatch.elapsedMilliseconds,
-        rowCount: affected,
-      );
+      if (logQuery) {
+        logger?.recordQuery(
+          sql,
+          tableName: tableName,
+          sourceFile: sourceFile,
+          executionTimeMs: stopwatch.elapsedMilliseconds,
+          rowCount: affected,
+        );
+      }
 
       return QueryResult(
         columns: const ['durum', 'etkilenen_satir'],

@@ -8,7 +8,11 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="com.vendata.vendata"
-            android:targetClass="com.vendata.vendata.MainActivity" />
+            android:targetClass="com.vendata.vendata.MainActivity">
+            <extra
+                android:name="some unique action key"
+                android:value="action_new_query" />
+        </intent>
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
     <shortcut
@@ -20,18 +24,26 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="com.vendata.vendata"
-            android:targetClass="com.vendata.vendata.MainActivity" />
+            android:targetClass="com.vendata.vendata.MainActivity">
+            <extra
+                android:name="some unique action key"
+                android:value="action_upload_file" />
+        </intent>
     </shortcut>
     <shortcut
         android:shortcutId="action_connections"
         android:enabled="true"
         android:icon="@drawable/ic_shortcut_server"
-        android:shortcutShortLabel="@string/shortcut_connections"
+        android:shortcutShortLabel="@string/shortcut_connections_short"
         android:shortcutLongLabel="@string/shortcut_connections">
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="com.vendata.vendata"
-            android:targetClass="com.vendata.vendata.MainActivity" />
+            android:targetClass="com.vendata.vendata.MainActivity">
+            <extra
+                android:name="some unique action key"
+                android:value="action_connections" />
+        </intent>
     </shortcut>
 </shortcuts>
 

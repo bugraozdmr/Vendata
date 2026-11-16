@@ -41,6 +41,8 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
   @override
   Widget build(BuildContext context) {
     final tablesState = ref.watch(tablesProvider);
+    final connectionsState = ref.watch(connectionsProvider);
+    final activeConnection = connectionsState.activeConnection;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
@@ -89,6 +91,26 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
                     ),
                   ],
                 ),
+                GestureDetector(
+                  onTap: tablesState.isLoading
+                      ? null
+                      : () => ref.read(tablesProvider.notifier).refreshTables(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Tooltip(
+                    message: 'Tabloları yenile',
+                    child: Container(
+                      height: 42,
+                      width: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Icon(Icons.refresh_rounded, size: 20, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ),
+                if (!tablesState.isRemote) const SizedBox(width: 8),
                 if (!tablesState.isRemote)
                   GestureDetector(
                     onTap: tablesState.isLoading ? null : _pickFile,
@@ -142,7 +164,12 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
             ),
             if (tablesState.isRemote) ...[
               const SizedBox(height: 14),
-              _buildRemoteBanner(tablesState),
+              _buildRemoteBanner(
+                tablesState,
+                activeConnection == null
+                    ? const ConnectionHealth()
+                    : connectionsState.healthFor(activeConnection.id),
+              ),
             ],
             if (tablesState.isLoading) ...[
               const SizedBox(height: 14),
@@ -263,13 +290,14 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     );
   }
 
-  Widget _buildRemoteBanner(TablesState tablesState) {
+  Widget _buildRemoteBanner(TablesState tablesState, ConnectionHealth health) {
+    final healthColor = _healthColor(health);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.successWash,
+        color: health.isOffline ? AppColors.errorWash : AppColors.successWash,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.success.withAlpha(60), width: 1.2),
+        border: Border.all(color: healthColor.withAlpha(60), width: 1.2),
       ),
       child: Row(
         children: [
@@ -279,7 +307,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.dns_rounded, size: 18, color: AppColors.success),
+            child: Icon(Icons.dns_rounded, size: 18, color: healthColor),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -288,18 +316,33 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Uzak bağlantı aktif',
+                  health.isOffline ? 'Uzak bağlantı koptu' : 'Uzak bağlantı aktif',
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                Text(
-                  tablesState.connectionLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textSecondary),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: healthColor, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${tablesState.connectionLabel} · ${_healthLabel(health)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 12,
+                          color: health.isOffline ? AppColors.error : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -336,6 +379,32 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
         ],
       ),
     );
+  }
+
+  Color _healthColor(ConnectionHealth health) {
+    switch (health.status) {
+      case ConnectionHealthStatus.online:
+        return AppColors.success;
+      case ConnectionHealthStatus.offline:
+        return AppColors.error;
+      case ConnectionHealthStatus.checking:
+        return AppColors.accent;
+      case ConnectionHealthStatus.unknown:
+        return AppColors.textMuted;
+    }
+  }
+
+  String _healthLabel(ConnectionHealth health) {
+    switch (health.status) {
+      case ConnectionHealthStatus.online:
+        return 'Çevrimiçi';
+      case ConnectionHealthStatus.offline:
+        return 'Erişilemiyor';
+      case ConnectionHealthStatus.checking:
+        return 'Kontrol ediliyor...';
+      case ConnectionHealthStatus.unknown:
+        return 'Bilinmiyor';
+    }
   }
 
   Widget _buildEmptyState() {
@@ -888,6 +957,4 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
       ),
     );
   }
-
-
 }

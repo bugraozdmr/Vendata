@@ -45,6 +45,7 @@ abstract class DbSession {
     String sql, {
     String? tableName,
     String? sourceFile,
+    bool logQuery = true,
   });
 
   Future<List<TableSchema>> getTables();
@@ -74,8 +75,14 @@ class LocalDbSession extends DbSession {
     String sql, {
     String? tableName,
     String? sourceFile,
+    bool logQuery = true,
   }) async {
-    return _engine.executeQuery(sql, tableName: tableName, sourceFile: sourceFile);
+    return _engine.executeQuery(
+      sql,
+      tableName: tableName,
+      sourceFile: sourceFile,
+      logQuery: logQuery,
+    );
   }
 
   @override

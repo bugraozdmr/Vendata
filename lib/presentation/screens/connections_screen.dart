@@ -91,48 +91,71 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                     letterSpacing: -1.0,
                   ),
                 ),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: state.isConnecting ? null : () => _openForm(),
-                  child: Container(
-                    height: 42,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: state.isConnecting ? AppColors.textMuted : AppColors.accent,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: state.isConnecting
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: AppColors.accent.withAlpha(45),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (state.isConnecting)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-                          )
-                        else
-                          const Icon(Icons.add_rounded, size: 20, color: Colors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Yeni Bağlantı',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => ref.read(connectionsProvider.notifier).checkAllHealth(),
+                      child: Tooltip(
+                        message: 'Bağlantı durumlarını yenile',
+                        child: Container(
+                          height: 42,
+                          width: 42,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.border),
                           ),
+                          child: Icon(Icons.refresh_rounded, size: 20, color: AppColors.textSecondary),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: state.isConnecting ? null : () => _openForm(),
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: state.isConnecting ? AppColors.textMuted : AppColors.accent,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: state.isConnecting
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: AppColors.accent.withAlpha(45),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (state.isConnecting)
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                              )
+                            else
+                              const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Yeni Bağlantı',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -169,7 +192,10 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
               const SizedBox(height: 12),
             ],
             if (state.activeConnection != null) ...[
-              _buildActiveCard(state.activeConnection!),
+              _buildActiveCard(
+                state.activeConnection!,
+                state.healthFor(state.activeConnection!.id),
+              ),
               const SizedBox(height: 18),
             ],
             Row(
@@ -206,7 +232,11 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
               _buildEmptyState()
             else
               ...state.connections.map(
-                (c) => _buildConnectionCard(c, isActive: state.activeConnection?.id == c.id),
+                (c) => _buildConnectionCard(
+                  c,
+                  isActive: state.activeConnection?.id == c.id,
+                  health: state.healthFor(c.id),
+                ),
               ),
           ],
         ),
@@ -214,13 +244,15 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
     );
   }
 
-  Widget _buildActiveCard(DbConnection connection) {
+  Widget _buildActiveCard(DbConnection connection, ConnectionHealth health) {
+    final statusColor = _healthColor(health);
+    final isOffline = health.isOffline;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.successWash,
+        color: isOffline ? AppColors.errorWash : AppColors.successWash,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.success.withAlpha(70), width: 1.4),
+        border: Border.all(color: statusColor.withAlpha(70), width: 1.4),
       ),
       child: Row(
         children: [
@@ -230,7 +262,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(_iconFor(connection.type), size: 20, color: AppColors.success),
+            child: Icon(_iconFor(connection.type), size: 20, color: statusColor),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -243,15 +275,18 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                     Container(
                       width: 7,
                       height: 7,
-                      decoration: BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      'Aktif Bağlantı',
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.success,
+                    Tooltip(
+                      message: health.message ?? _healthLabel(health),
+                      child: Text(
+                        isOffline ? 'Bağlantı Kesildi' : 'Aktif Bağlantı',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
                       ),
                     ),
                   ],
@@ -344,14 +379,21 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
     );
   }
 
-  Widget _buildConnectionCard(DbConnection connection, {required bool isActive}) {
+  Widget _buildConnectionCard(
+    DbConnection connection, {
+    required bool isActive,
+    required ConnectionHealth health,
+  }) {
+    final statusColor = _healthColor(health);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: isActive ? Border.all(color: AppColors.success.withAlpha(70), width: 1.4) : null,
+        border: isActive
+            ? Border.all(color: statusColor.withAlpha(70), width: 1.4)
+            : (health.isOffline ? Border.all(color: AppColors.error.withAlpha(45)) : null),
         boxShadow: [
           BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
         ],
@@ -388,6 +430,29 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 4),
+                Tooltip(
+                  message: health.message ?? _healthLabel(health),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _healthLabel(health),
+                        style: GoogleFonts.dmSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -498,6 +563,32 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
         return Icons.storage_rounded;
       case DbType.mysql:
         return Icons.dns_rounded;
+    }
+  }
+
+  Color _healthColor(ConnectionHealth health) {
+    switch (health.status) {
+      case ConnectionHealthStatus.online:
+        return AppColors.success;
+      case ConnectionHealthStatus.offline:
+        return AppColors.error;
+      case ConnectionHealthStatus.checking:
+        return AppColors.warning;
+      case ConnectionHealthStatus.unknown:
+        return AppColors.textMuted;
+    }
+  }
+
+  String _healthLabel(ConnectionHealth health) {
+    switch (health.status) {
+      case ConnectionHealthStatus.online:
+        return 'Çevrimiçi';
+      case ConnectionHealthStatus.offline:
+        return 'Çevrimdışı';
+      case ConnectionHealthStatus.checking:
+        return 'Kontrol ediliyor...';
+      case ConnectionHealthStatus.unknown:
+        return 'Durum bilinmiyor';
     }
   }
 }

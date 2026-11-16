@@ -110,9 +110,20 @@ Masa,Mobilya,4500.5,5
       engine.toggleQueryFavorite(firstQuery.id);
       expect(engine.getSavedQueries(onlyFavorites: true).isEmpty, true);
 
-      // Toggle by SQL
-      engine.toggleQueryFavoriteBySql('SELECT * FROM satislar;');
+      // Star by SQL (uniform state across duplicate history rows)
+      expect(engine.isQueryFavorite('SELECT * FROM satislar;'), false);
+      engine.setQueryFavoriteBySql('SELECT * FROM satislar;', favorite: true);
+      expect(engine.isQueryFavorite('SELECT * FROM satislar;'), true);
       expect(engine.getSavedQueries(onlyFavorites: true).length, 1);
+      engine.setQueryFavoriteBySql('SELECT * FROM satislar;', favorite: false);
+      expect(engine.isQueryFavorite('SELECT * FROM satislar;'), false);
+
+      // A query that has not been executed yet can be starred
+      const unrun = 'SELECT 42 AS cevap;';
+      expect(engine.isQueryFavorite(unrun), false);
+      engine.setQueryFavoriteBySql(unrun, favorite: true);
+      expect(engine.isQueryFavorite(unrun), true);
+      expect(engine.getFavoriteSqls().contains(unrun), true);
 
       // Table specific filtering
       final tableQueries = engine.getSavedQueries(tableName: 'satislar');

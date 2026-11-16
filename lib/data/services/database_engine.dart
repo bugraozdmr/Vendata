@@ -242,7 +242,12 @@ class DatabaseEngine {
     return null;
   }
 
-  QueryResult executeQuery(String sql, {String? tableName, String? sourceFile}) {
+  QueryResult executeQuery(
+    String sql, {
+    String? tableName,
+    String? sourceFile,
+    bool logQuery = true,
+  }) {
     final trimmed = sql.trim();
     if (trimmed.isEmpty) return QueryResult.empty();
 
@@ -262,13 +267,15 @@ class DatabaseEngine {
           rows.add(List<dynamic>.from(row.values));
         }
 
-        _logQuery(
-          sql,
-          tableName: tableName,
-          sourceFile: sourceFile,
-          executionTimeMs: stopwatch.elapsedMilliseconds,
-          rowCount: rows.length,
-        );
+        if (logQuery) {
+          _logQuery(
+            sql,
+            tableName: tableName,
+            sourceFile: sourceFile,
+            executionTimeMs: stopwatch.elapsedMilliseconds,
+            rowCount: rows.length,
+          );
+        }
 
         return QueryResult(
           columns: resultSet.columnNames,
@@ -280,13 +287,15 @@ class DatabaseEngine {
         _db.execute(sql);
         stopwatch.stop();
 
-        _logQuery(
-          sql,
-          tableName: tableName,
-          sourceFile: sourceFile,
-          executionTimeMs: stopwatch.elapsedMilliseconds,
-          rowCount: _db.updatedRows,
-        );
+        if (logQuery) {
+          _logQuery(
+            sql,
+            tableName: tableName,
+            sourceFile: sourceFile,
+            executionTimeMs: stopwatch.elapsedMilliseconds,
+            rowCount: _db.updatedRows,
+          );
+        }
 
         return QueryResult(
           columns: ['durum', 'etkilenen_satir'],
@@ -393,12 +402,56 @@ class DatabaseEngine {
     } catch (_) {}
   }
 
-  void toggleQueryFavoriteBySql(String sql) {
+  Set<String> getFavoriteSqls() {
+    try {
+      final res = _db.select(
+        'SELECT DISTINCT query_text FROM _vendata_saved_queries WHERE is_favorite = 1;',
+      );
+      return res
+          .map((r) => (r['query_text'] as String? ?? '').trim())
+          .where((s) => s.isNotEmpty)
+          .toSet();
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  bool isQueryFavorite(String sql) {
     try {
       final trimmed = sql.trim();
-      _db.execute(
-        'UPDATE _vendata_saved_queries SET is_favorite = (CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END) WHERE query_text = ?;',
+      if (trimmed.isEmpty) return false;
+      final res = _db.select(
+        'SELECT 1 FROM _vendata_saved_queries WHERE query_text = ? AND is_favorite = 1 LIMIT 1;',
         [trimmed],
+      );
+      return res.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void setQueryFavoriteBySql(
+    String sql, {
+    required bool favorite,
+    String? tableName,
+  }) {
+    try {
+      final trimmed = sql.trim();
+      if (trimmed.isEmpty) return;
+
+      final existing = _db.select(
+        'SELECT id FROM _vendata_saved_queries WHERE query_text = ? ORDER BY id DESC LIMIT 1;',
+        [trimmed],
+      );
+
+      if (existing.isEmpty) {
+        if (!favorite) return;
+        _logQuery(trimmed, tableName: tableName);
+      }
+
+      _db.execute(
+        'UPDATE _vendata_saved_queries SET is_favorite = ? WHERE query_text = ?;',
+        [favorite ? 1 : 0, trimmed],
       );
     } catch (_) {}
   }

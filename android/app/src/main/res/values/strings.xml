@@ -3,5 +3,6 @@
     <string name="shortcut_new_query">Yeni Sorgu</string>
     <string name="shortcut_upload_file">Dosya Yükle</string>
     <string name="shortcut_connections">Sunucu Bağlantıları</string>
+    <string name="shortcut_connections_short">Bağlantılar</string>
 </resources>
 

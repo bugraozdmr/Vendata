@@ -13,6 +13,7 @@ class VisualQueryBuilder extends StatefulWidget {
   final void Function(String sql) onExecute;
   final ValueChanged<String>? onTableChanged;
   final ValueChanged<VisualQuery>? onQueryChanged;
+  final List<String> joinTypes;
 
   const VisualQueryBuilder({
     super.key,
@@ -23,6 +24,13 @@ class VisualQueryBuilder extends StatefulWidget {
     required this.onExecute,
     this.onTableChanged,
     this.onQueryChanged,
+    this.joinTypes = const [
+      'LEFT JOIN',
+      'INNER JOIN',
+      'RIGHT JOIN',
+      'FULL OUTER JOIN',
+      'CROSS JOIN',
+    ],
   });
 
   @override
@@ -115,24 +123,16 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
 
     return Column(
       children: [
-        // Sub-navigation pills
-        SizedBox(
-          height: 38,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            children: [
-              _buildSubNavPill(0, 'Sütun & Filtre', Icons.filter_list_rounded),
-              const SizedBox(width: 8),
-              _buildSubNavPill(1, 'Grupla & Özet', Icons.pie_chart_rounded),
-              const SizedBox(width: 8),
-              _buildSubNavPill(2, 'Hesapla', Icons.functions_rounded),
-              if (widget.tables.length >= 2) ...[
-                const SizedBox(width: 8),
-                _buildSubNavPill(3, 'JOIN', Icons.alt_route_rounded),
-              ],
-            ],
-          ),
+        // Sub-navigation pills (wrap so JOIN is always visible)
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildSubNavPill(0, 'Sütun & Filtre', Icons.filter_list_rounded),
+            _buildSubNavPill(1, 'Grupla & Özet', Icons.pie_chart_rounded),
+            _buildSubNavPill(2, 'Hesapla', Icons.functions_rounded),
+            _buildSubNavPill(3, 'JOIN', Icons.alt_route_rounded),
+          ],
         ),
         const SizedBox(height: 12),
 
@@ -256,18 +256,24 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                 child: Icon(Icons.table_chart_rounded, size: 22, color: AppColors.accent),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tablo Seçiniz',
-                    style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                  ),
-                  Text(
-                    'İşlem yapacağınız tabloyu belirleyin',
-                    style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tablo Seçiniz',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                    Text(
+                      'İşlem yapacağınız tabloyu belirleyin',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1071,6 +1077,29 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
     }
     final otherTables = widget.tables.where((t) => t.name != _query.selectedTable).toList();
 
+    if (otherTables.isEmpty) {
+      return _buildCard(
+        title: 'Tablo Birleştir (JOIN)',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.alt_route_rounded, size: 34, color: AppColors.textMuted.withAlpha(140)),
+            const SizedBox(height: 10),
+            Text(
+              'JOIN için en az iki tablo gerekir.',
+              style: GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Veriler sekmesinden ikinci bir tablo veya dosya yükleyin; '
+              'ardından buradan tabloları birleştirebilirsiniz.',
+              style: GoogleFonts.dmSans(fontSize: 12, height: 1.4, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+      );
+    }
+
     return _buildCard(
       title: 'Tablo Birleştir (JOIN)',
       child: Column(
@@ -1109,8 +1138,10 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
                   child: _buildMiniDropdown(
                     label: 'Tür',
                     value: _query.joinConfig!.type,
-                    items: const ['LEFT JOIN', 'INNER JOIN'],
-                    onChanged: (v) => setState(() => _query.joinConfig!.type = v ?? 'LEFT JOIN'),
+                    items: widget.joinTypes.contains(_query.joinConfig!.type)
+                        ? widget.joinTypes
+                        : [...widget.joinTypes, _query.joinConfig!.type],
+                    onChanged: (v) => setState(() => _query.joinConfig!.type = v ?? widget.joinTypes.first),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1135,30 +1166,37 @@ class _VisualQueryBuilderState extends State<VisualQueryBuilder> {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMiniDropdown(
-                    label: '${_query.selectedTable} sütunu',
-                    value: _query.joinConfig!.leftCol,
-                    items: _availableColumns,
-                    onChanged: (v) => setState(() => _query.joinConfig!.leftCol = v ?? ''),
+            if (_query.joinConfig!.type == 'CROSS JOIN')
+              Text(
+                'CROSS JOIN tüm satırları birbiriyle eşleştirir (kartezyen çarpım); '
+                'ON koşulu kullanılmaz.',
+                style: GoogleFonts.dmSans(fontSize: 12, height: 1.4, color: AppColors.textMuted),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMiniDropdown(
+                      label: '${_query.selectedTable} sütunu',
+                      value: _query.joinConfig!.leftCol,
+                      items: _availableColumns,
+                      onChanged: (v) => setState(() => _query.joinConfig!.leftCol = v ?? ''),
+                    ),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Text('=', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-                Expanded(
-                  child: _buildMiniDropdown(
-                    label: '${_query.joinConfig!.table} sütunu',
-                    value: _query.joinConfig!.rightCol,
-                    items: otherTables.firstWhere((t) => t.name == _query.joinConfig!.table, orElse: () => otherTables.first).columnNames,
-                    onChanged: (v) => setState(() => _query.joinConfig!.rightCol = v ?? ''),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Text('=', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
-                ),
-              ],
-            ),
+                  Expanded(
+                    child: _buildMiniDropdown(
+                      label: '${_query.joinConfig!.table} sütunu',
+                      value: _query.joinConfig!.rightCol,
+                      items: otherTables.firstWhere((t) => t.name == _query.joinConfig!.table, orElse: () => otherTables.first).columnNames,
+                      onChanged: (v) => setState(() => _query.joinConfig!.rightCol = v ?? ''),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ],
       ),
